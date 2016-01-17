@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package fproxy.proto;
+
+option go_package = "proto";
+
+service Backend {
+  rpc Hello(HelloRequest) returns (HelloResponse);
+}
+
+message HelloRequest {
+  string thingy = 1;
+}
+
+message HelloResponse {
+  string greeting = 1;
+}

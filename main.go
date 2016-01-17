@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/codegangsta/cli"
@@ -18,14 +17,7 @@ func main() {
 	app.Version = "0.1"
 	app.Commands = []cli.Command{
 		feCommand,
-		{
-			Name:    "backend",
-			Aliases: []string{"be"},
-			Usage:   "Run the backend.",
-			Action: func(c *cli.Context) {
-				fmt.Println("Unimplemented.")
-			},
-		},
+		beCommand,
 	}
 
 	app.Run(os.Args)

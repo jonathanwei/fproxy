@@ -8,6 +8,9 @@ message FrontendConfig {
   // Configuration for the frontend's TCP proxy. Can be left unset if a TCP
   // proxy is not required.
   repeated TCPProxyRoute tcp_proxy_route = 1;
+
+  // TODO: make this repeated.
+  string backend_addr = 2;
 }
 
 message TCPProxyRoute {

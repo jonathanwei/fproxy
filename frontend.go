@@ -1,14 +1,16 @@
 package main
 
 import (
-	"io/ioutil"
 	"log"
-	"os"
-	"path/filepath"
 	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/net/context"
+
+	"google.golang.org/grpc"
 
 	"github.com/codegangsta/cli"
-	"github.com/golang/protobuf/proto"
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
@@ -31,31 +33,47 @@ dialing address for proxying. A sample clause:
   }
 `),
 	Action: func(c *cli.Context) {
-		runFe(readFeConfig(c.Args()))
+		runFe(defaultConfigPath(c, "frontend.textproto"))
 	},
 }
 
-func runFe(config *pb.FrontendConfig) {
-	runTCPProxy(config.TcpProxyRoute)
+func runFe(configPath string) {
+	var config pb.FrontendConfig
+	readConfig(configPath, &config)
+
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runTCPProxy(config.TcpProxyRoute)
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runTestClient(config.BackendAddr)
+	}()
 }
 
-func readFeConfig(args []string) *pb.FrontendConfig {
-	configPath := filepath.Join(os.Getenv("HOME"), ".config/fproxy/frontend.textproto")
-	if len(args) > 0 {
-		configPath = args[0]
-	}
-
-	protoBytes, err := ioutil.ReadFile(configPath)
+func runTestClient(backendAddr string) {
+	conn, err := grpc.Dial(backendAddr, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("Could not read frontend config: %v", err)
+		log.Printf("Couldn't connect to backend: %v", err)
 	}
+	defer conn.Close()
 
-	var config pb.FrontendConfig
+	client := pb.NewBackendClient(conn)
 
-	err = proto.UnmarshalText(string(protoBytes), &config)
-	if err != nil {
-		log.Fatalf("Could not parse frontend config: %v", err)
+	for {
+		resp, err := client.Hello(context.Background(), &pb.HelloRequest{Thingy: "client"})
+		if err != nil {
+			log.Printf("Got error from server: %v", err)
+		} else {
+			log.Printf("Got response from server: %v", resp)
+		}
+
+		time.Sleep(500 * time.Millisecond)
 	}
-
-	return &config
 }

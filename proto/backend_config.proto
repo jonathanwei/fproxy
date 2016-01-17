@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package fproxy.proto;
+
+option go_package = "proto";
+
+message BackendConfig {
+  string server_addr = 1;
+}
+

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 
 	"golang.org/x/net/context"
 
@@ -54,14 +53,6 @@ func runBe(configPath string) {
 
 type backendServer struct{}
 
-func (b *backendServer) Hello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
-	glog.Infof("Got request: %v", req)
-	return &pb.HelloResponse{Greeting: "Hello " + req.Thingy}, nil
-}
-
 func (b *backendServer) GetNode(ctx context.Context, req *pb.GetNodeRequest) (*pb.GetNodeResponse, error) {
-	return nil, grpc.Errorf(
-		codes.Unimplemented,
-		"Unimplemented.",
-	)
+	return tempData, nil
 }

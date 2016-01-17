@@ -3,9 +3,6 @@ package main
 import (
 	"strings"
 	"sync"
-	"time"
-
-	"golang.org/x/net/context"
 
 	"google.golang.org/grpc"
 
@@ -46,7 +43,6 @@ func runFe(configPath string) {
 	readConfig(configPath, &config)
 
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	wg.Add(1)
 	go func() {
@@ -54,36 +50,19 @@ func runFe(configPath string) {
 		runTCPProxy(config.TcpProxyRoute)
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		runTestClient(config.BackendAddr)
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		runHttpServer(config.HttpAddr)
-	}()
-}
-
-func runTestClient(backendAddr string) {
-	conn, err := grpc.Dial(backendAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(config.BackendAddr, grpc.WithInsecure())
 	if err != nil {
 		glog.Warningf("Couldn't connect to backend: %v", err)
 	}
 	defer conn.Close()
 
-	client := pb.NewBackendClient(conn)
+	backendClient := pb.NewBackendClient(conn)
 
-	for {
-		resp, err := client.Hello(context.Background(), &pb.HelloRequest{Thingy: "client"})
-		if err != nil {
-			glog.Warningf("Got error from server: %v", err)
-		} else {
-			glog.Infof("Got response from server: %v", resp)
-		}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runHttpServer(config.HttpAddr, backendClient)
+	}()
 
-		time.Sleep(500 * time.Millisecond)
-	}
+	wg.Wait()
 }

@@ -37,7 +37,6 @@ func proxyTCPConn(from net.Conn, toAddr string) {
 
 func proxyTCP(from string, to string) {
 	var wg sync.WaitGroup
-	defer wg.Wait()
 
 	l, err := net.Listen("tcp", from)
 	if err != nil {
@@ -57,7 +56,7 @@ func proxyTCP(from string, to string) {
 				continue
 			}
 
-			return
+			break
 		}
 
 		wg.Add(1)
@@ -66,6 +65,8 @@ func proxyTCP(from string, to string) {
 			proxyTCPConn(conn, to)
 		}()
 	}
+
+	wg.Wait()
 }
 
 func runTCPProxy(routes []*pb.TCPProxyRoute) {

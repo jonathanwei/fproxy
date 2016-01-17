@@ -7,18 +7,8 @@ import "proto/filesystem.proto";
 option go_package = "proto";
 
 service Backend {
-  rpc Hello(HelloRequest) returns (HelloResponse);
-
   // Gets a node's meta information from the backend.
   rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
-}
-
-message HelloRequest {
-  string thingy = 1;
-}
-
-message HelloResponse {
-  string greeting = 1;
 }
 
 message GetNodeRequest {

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -88,17 +86,4 @@ func runTestClient(backendAddr string) {
 
 		time.Sleep(500 * time.Millisecond)
 	}
-}
-
-func runHttpServer(serverAddr string) {
-	mux := http.NewServeMux()
-	mux.Handle("/", &feHandler{})
-	glog.Warning(http.ListenAndServe(serverAddr, mux))
-}
-
-type feHandler struct {
-}
-
-func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	io.WriteString(rw, "Hello World!")
 }

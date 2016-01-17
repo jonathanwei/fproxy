@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package fproxy;
+
+option go_package = "proto";
+
+message Node {
+  // Base name of node.
+  string name = 1;
+
+  // The type of this particular node.
+  enum Kind {
+    // For future compatibility.
+    UNKNOWN = 0;
+
+    // A single file.
+    FILE = 1;
+
+    // A directory listing.
+    DIR = 2;
+  }
+  Kind kind = 2;
+
+  // Nested children of the node. Will be set iff kind == DIR.
+  repeated Node child = 3;
+
+  // Size in bytes. Will be set iff kind == FILE.
+  int64 size_bytes = 4;
+}

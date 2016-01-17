@@ -1,11 +1,16 @@
 syntax = "proto3";
 
-package fproxy.proto;
+package fproxy;
+
+import "proto/filesystem.proto";
 
 option go_package = "proto";
 
 service Backend {
   rpc Hello(HelloRequest) returns (HelloResponse);
+
+  // Gets a node's meta information from the backend.
+  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
 }
 
 message HelloRequest {
@@ -14,4 +19,12 @@ message HelloRequest {
 
 message HelloResponse {
   string greeting = 1;
+}
+
+message GetNodeRequest {
+}
+
+message GetNodeResponse {
+  // The meta information about the requested node and its children, if any.
+  fproxy.Node node = 1;
 }

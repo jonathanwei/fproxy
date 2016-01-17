@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package fproxy.proto;
+package fproxy;
 
 option go_package = "proto";
 

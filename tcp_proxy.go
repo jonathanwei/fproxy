@@ -12,8 +12,7 @@ import (
 	"time"
 )
 
-func proxyTcpConn(wg *sync.WaitGroup, from net.Conn, toAddr string) {
-	defer wg.Done()
+func proxyTCPConn(from net.Conn, toAddr string) {
 	defer from.Close()
 
 	to, err := net.Dial("tcp", toAddr)
@@ -38,8 +37,9 @@ func proxyTcpConn(wg *sync.WaitGroup, from net.Conn, toAddr string) {
 	}
 }
 
-func proxyTcp(wg *sync.WaitGroup, from string, to string) {
-	defer wg.Done()
+func proxyTCP(from string, to string) {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 
 	l, err := net.Listen("tcp", from)
 	if err != nil {
@@ -63,7 +63,10 @@ func proxyTcp(wg *sync.WaitGroup, from string, to string) {
 		}
 
 		wg.Add(1)
-		go proxyTcpConn(wg, conn, to)
+		go func() {
+			defer wg.Done()
+			proxyTCPConn(conn, to)
+		}()
 	}
 }
 
@@ -92,8 +95,12 @@ func main() {
 
 	var wg sync.WaitGroup
 	for _, route := range config.Routes {
+		route := route
 		wg.Add(1)
-		go proxyTcp(&wg, route.Listen, route.Dial)
+		go func() {
+			defer wg.Done()
+			proxyTCP(route.Listen, route.Dial)
+		}()
 	}
 	wg.Wait()
 }

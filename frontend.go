@@ -19,6 +19,16 @@ var feCommand = cli.Command{
 	ArgsUsage: "[path/to/config/proto]",
 	Description: strings.TrimSpace(`
 The default path for the config proto is "~/.config/fproxy/frontend.textproto".
+
+Supported fields in the config are listed below.
+
+tcp_proxy_route: this repeated field lets you configure the frontend to perform
+TCP proxying. Each clause must set a single listening address and set a target
+dialing address for proxying. A sample clause:
+  tcp_proxy_route {
+    listen: ":8080"
+    dial: "example.com:80"
+  }
 `),
 	Action: func(c *cli.Context) {
 		runFe(readFeConfig(c.Args()))

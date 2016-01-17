@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"path"
+	"path/filepath"
 	"text/template"
 
 	"golang.org/x/net/context"
@@ -21,24 +22,6 @@ type feHandler struct {
 	client pb.BackendClient
 }
 
-var tempData = &pb.GetNodeResponse{
-	Node: &pb.Node{
-		Name: "foo",
-		Kind: pb.Node_DIR,
-		Child: []*pb.Node{
-			{
-				Name:      "bar",
-				Kind:      pb.Node_FILE,
-				SizeBytes: 1000,
-			},
-			{
-				Name: "baz",
-				Kind: pb.Node_DIR,
-			},
-		},
-	},
-}
-
 const tmplText = `
 <!doctype html>
 <html>
@@ -47,12 +30,22 @@ const tmplText = `
 		<title>{{.Node.Name}}</title>
 	</head>
 	<body>
-		{{.Node.Name}}
+		{{if ne .ParentDir ""}}
+			<a href="{{.ParentDir}}">
+				{{if eq .ParentDir "/"}}
+					..
+				{{else}}
+					{{.ParentDir}}
+				{{end}}
+			</a>/{{.Node.Name}}
+		{{end}}
 		{{if eq .Node.Kind 1}}
 			({{.Node.SizeBytes}} bytes)
 		{{else if eq .Node.Kind 2}}
 			{{range .Node.Child}}
-				<div style="margin-left: 16px">{{ . }}</div>
+				<div style="margin-left: 16px">
+					<a href="{{pathClean (print $.Path "/" .Name)}}">{{.Name}} ({{.Kind}})</a>
+				</div>
 			{{else}}
 				<div><strong>no children</strong></div>
 			{{end}}
@@ -60,7 +53,11 @@ const tmplText = `
 	</body>
 </html>`
 
-var tmpl = template.Must(template.New("listing").Parse(tmplText))
+var tmpl = template.Must(template.New("listing").
+	Funcs(template.FuncMap{
+		"pathClean": path.Clean,
+	}).
+	Parse(tmplText))
 
 func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	beReq := &pb.GetNodeRequest{
@@ -73,7 +70,20 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	err = tmpl.Execute(rw, res)
+	parentDir := filepath.Dir(beReq.Path)
+
+	// If we're already at the root, then there is no parent dir.
+	if parentDir == beReq.Path {
+		parentDir = ""
+	}
+
+	tmplData := struct {
+		Node      *pb.Node
+		Path      string
+		ParentDir string
+	}{res.Node, beReq.Path, parentDir}
+
+	err = tmpl.Execute(rw, tmplData)
 	if err != nil {
 		glog.Infof("Failed to write HTTP response: %v", err)
 	}

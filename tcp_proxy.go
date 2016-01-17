@@ -70,7 +70,7 @@ func proxyTCP(from string, to string) {
 	}
 }
 
-func main() {
+func runTCPProxy() {
 	var config struct {
 		Routes []struct {
 			Listen string `json:"listen"`

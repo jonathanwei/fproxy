@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -31,6 +33,10 @@ dialing address for proxying. A sample clause:
     listen: ":8080"
     dial: "example.com:80"
   }
+
+http_addr: this field lets you set the address to listen on for serving HTTP
+requests. A sample clause:
+  http_addr: ":8000"
 `),
 	Action: func(c *cli.Context) {
 		runFe(defaultConfigPath(c, "frontend.textproto"))
@@ -55,6 +61,12 @@ func runFe(configPath string) {
 		defer wg.Done()
 		runTestClient(config.BackendAddr)
 	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runHttpServer(config.HttpAddr)
+	}()
 }
 
 func runTestClient(backendAddr string) {
@@ -76,4 +88,17 @@ func runTestClient(backendAddr string) {
 
 		time.Sleep(500 * time.Millisecond)
 	}
+}
+
+func runHttpServer(serverAddr string) {
+	mux := http.NewServeMux()
+	mux.Handle("/", &feHandler{})
+	glog.Warning(http.ListenAndServe(serverAddr, mux))
+}
+
+type feHandler struct {
+}
+
+func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	io.WriteString(rw, "Hello World!")
 }

@@ -11,6 +11,9 @@ message FrontendConfig {
 
   // TODO: make this repeated.
   string backend_addr = 2;
+
+  // The address to listen on for HTTP requests.
+  string http_addr = 3;
 }
 
 message TCPProxyRoute {

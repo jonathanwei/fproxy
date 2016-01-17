@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -70,17 +68,12 @@ func proxyTCP(from string, to string) {
 	}
 }
 
-func runTCPProxy() {
+func runTCPProxy(configPath string) {
 	var config struct {
 		Routes []struct {
 			Listen string `json:"listen"`
 			Dial   string `json:"dial"`
 		} `json:"routes"`
-	}
-
-	configPath := filepath.Join(os.Getenv("HOME"), ".config/fproxy/tcp.json")
-	if len(os.Args) > 1 {
-		configPath = os.Args[1]
 	}
 
 	jsonBlob, err := ioutil.ReadFile(configPath)

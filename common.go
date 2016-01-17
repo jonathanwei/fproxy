@@ -2,11 +2,11 @@ package main
 
 import (
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/codegangsta/cli"
+	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -29,11 +29,11 @@ func firstOrDefault(args []string, defaultArg string) string {
 func readConfig(configPath string, msg proto.Message) {
 	protoBytes, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		log.Fatalf("Could not read config at path %v: %v", configPath, err)
+		glog.Fatalf("Could not read config at path %v: %v", configPath, err)
 	}
 
 	err = proto.UnmarshalText(string(protoBytes), msg)
 	if err != nil {
-		log.Fatalf("Could not parse config at path %v: %v", configPath, err)
+		glog.Fatalf("Could not parse config at path %v: %v", configPath, err)
 	}
 }

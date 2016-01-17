@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"strings"
 
@@ -10,6 +9,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/codegangsta/cli"
+	"github.com/golang/glog"
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
@@ -37,23 +37,23 @@ func runBe(configPath string) {
 
 	l, err := net.Listen("tcp", config.ServerAddr)
 	if err != nil {
-		log.Fatalf("Failed to listen on %v: %v", config.ServerAddr, err)
+		glog.Fatalf("Failed to listen on %v: %v", config.ServerAddr, err)
 	}
 	defer l.Close()
 
-	log.Printf("Listening for requests on %v", l.Addr())
+	glog.Infof("Listening for requests on %v", l.Addr())
 
 	s := grpc.NewServer()
 	pb.RegisterBackendServer(s, &backendServer{})
 	err = s.Serve(l)
 	if err != nil {
-		log.Fatalf("Failed to serve on %v: %v", config.ServerAddr, err)
+		glog.Fatalf("Failed to serve on %v: %v", config.ServerAddr, err)
 	}
 }
 
 type backendServer struct{}
 
 func (b *backendServer) Hello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
-	log.Printf("Got request: %v", req)
+	glog.Infof("Got request: %v", req)
 	return &pb.HelloResponse{Greeting: "Hello " + req.Thingy}, nil
 }

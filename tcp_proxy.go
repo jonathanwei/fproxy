@@ -2,11 +2,11 @@ package main
 
 import (
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
@@ -15,7 +15,7 @@ func proxyTCPConn(from net.Conn, toAddr string) {
 
 	to, err := net.Dial("tcp", toAddr)
 	if err != nil {
-		log.Printf("Tried to connect to %v, got %v.", toAddr, err)
+		glog.Warningf("Tried to connect to %v, got %v.", toAddr, err)
 		return
 	}
 	defer to.Close()
@@ -31,7 +31,7 @@ func proxyTCPConn(from net.Conn, toAddr string) {
 
 	err = <-ch
 	if err != nil {
-		log.Printf("Closing connection due to %v.", err)
+		glog.Infof("Closing connection due to %v.", err)
 	}
 }
 
@@ -41,17 +41,17 @@ func proxyTCP(from string, to string) {
 
 	l, err := net.Listen("tcp", from)
 	if err != nil {
-		log.Printf("Tried to listen on %v, got %v.", from, err)
+		glog.Warningf("Tried to listen on %v, got %v.", from, err)
 		return
 	}
 	defer l.Close()
 
-	log.Printf("Listening on %v.", l.Addr())
+	glog.Infof("Listening on %v.", l.Addr())
 
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Printf("Tried to accept on %v, got %v.", from, err)
+			glog.Warningf("Tried to accept on %v, got %v.", from, err)
 			if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
 				time.Sleep(100 * time.Millisecond)
 				continue

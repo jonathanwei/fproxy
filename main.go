@@ -1,12 +1,18 @@
 package main
 
 import (
+	"flag"
 	"os"
 
 	"github.com/codegangsta/cli"
+
+	// Redirect grpc logs to glog.
+	_ "google.golang.org/grpc/grpclog/glogger"
 )
 
 func main() {
+	flag.Parse()
+
 	app := cli.NewApp()
 	app.Name = "fproxy"
 	app.Usage = "A file proxy server with SSH and web access."
@@ -20,5 +26,9 @@ func main() {
 		beCommand,
 	}
 
-	app.Run(os.Args)
+	var flags []string
+	flags = append(flags, os.Args[0])
+	flags = append(flags, flag.Args()...)
+
+	app.Run(flags)
 }

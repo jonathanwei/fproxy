@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/codegangsta/cli"
+	"github.com/golang/glog"
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
@@ -60,7 +60,7 @@ func runFe(configPath string) {
 func runTestClient(backendAddr string) {
 	conn, err := grpc.Dial(backendAddr, grpc.WithInsecure())
 	if err != nil {
-		log.Printf("Couldn't connect to backend: %v", err)
+		glog.Warningf("Couldn't connect to backend: %v", err)
 	}
 	defer conn.Close()
 
@@ -69,9 +69,9 @@ func runTestClient(backendAddr string) {
 	for {
 		resp, err := client.Hello(context.Background(), &pb.HelloRequest{Thingy: "client"})
 		if err != nil {
-			log.Printf("Got error from server: %v", err)
+			glog.Warningf("Got error from server: %v", err)
 		} else {
-			log.Printf("Got response from server: %v", resp)
+			glog.Infof("Got response from server: %v", resp)
 		}
 
 		time.Sleep(500 * time.Millisecond)

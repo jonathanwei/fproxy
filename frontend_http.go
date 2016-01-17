@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"path"
 	"text/template"
 
 	"golang.org/x/net/context"
@@ -46,15 +47,26 @@ const tmplText = `
 		<title>{{.Node.Name}}</title>
 	</head>
 	<body>
-		{{range .Node.Child}}<div>{{ . }}</div>{{else}}<div><strong>no rows</strong></div>{{end}}
+		{{.Node.Name}}
+		{{if eq .Node.Kind 1}}
+			({{.Node.SizeBytes}} bytes)
+		{{else if eq .Node.Kind 2}}
+			{{range .Node.Child}}
+				<div style="margin-left: 16px">{{ . }}</div>
+			{{else}}
+				<div><strong>no children</strong></div>
+			{{end}}
+		{{end}}
 	</body>
 </html>`
 
 var tmpl = template.Must(template.New("listing").Parse(tmplText))
 
 func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	beReq := &pb.GetNodeRequest{}
-	res, err := f.client.GetNode(context.TODO(), &pb.GetNodeRequest{})
+	beReq := &pb.GetNodeRequest{
+		Path: path.Clean("/" + req.URL.Path),
+	}
+	res, err := f.client.GetNode(context.TODO(), beReq)
 	if err != nil {
 		glog.Warningf("GetNode RPC failed. Request: %v, error: %v", beReq, err)
 		http.Error(rw, "Failed.", http.StatusInternalServerError)

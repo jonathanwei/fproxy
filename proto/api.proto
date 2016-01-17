@@ -12,6 +12,7 @@ service Backend {
 }
 
 message GetNodeRequest {
+  string path = 1;
 }
 
 message GetNodeResponse {

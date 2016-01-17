@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"google.golang.org/grpc"
@@ -54,5 +57,72 @@ func runBe(configPath string) {
 type backendServer struct{}
 
 func (b *backendServer) GetNode(ctx context.Context, req *pb.GetNodeRequest) (*pb.GetNodeResponse, error) {
-	return tempData, nil
+	node, err := getNodeFromPath(req.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.GetNodeResponse{Node: node}, nil
+}
+
+func getNodeFromPath(path string) (*pb.Node, error) {
+	path = filepath.Clean("/" + path)
+
+	// TODO: take the base directory from the config instead of always using ".".
+	path = filepath.Join(".", path)
+
+	if lg := glog.V(2); lg {
+		lg.Infof("Fetching path %q", path)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	finfo, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := getNodeFromFileInfo(finfo)
+	if err != nil || node.Kind == pb.Node_FILE {
+		return node, err
+	}
+
+	chinfos, err := f.Readdir(-1)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, chinfo := range chinfos {
+		chnode, err := getNodeFromFileInfo(chinfo)
+		if err != nil {
+			glog.Warningf("Got error traversing dir: %v", err)
+			continue
+		}
+
+		node.Child = append(node.Child, chnode)
+	}
+
+	return node, nil
+}
+
+func getNodeFromFileInfo(finfo os.FileInfo) (*pb.Node, error) {
+	if finfo.Mode().IsRegular() {
+		return &pb.Node{
+			Name:      finfo.Name(),
+			Kind:      pb.Node_FILE,
+			SizeBytes: finfo.Size(),
+		}, nil
+	}
+
+	if finfo.Mode().IsDir() {
+		return &pb.Node{
+			Name: finfo.Name(),
+			Kind: pb.Node_DIR,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("File wasn't a dir or a regular file: %v", finfo.Mode())
 }

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package fproxy.proto;
+
+option go_package = "proto";
+
+message FrontendConfig {
+  // Configuration for the frontend's TCP proxy. Can be left unset if a TCP
+  // proxy is not required.
+  repeated TCPProxyRoute tcp_proxy_route = 1;
+}
+
+message TCPProxyRoute {
+  // Address to listen on.
+  string listen = 1;
+
+  // Address to proxy connections to.
+  string dial = 2;
+}

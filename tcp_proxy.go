@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"sync"
 	"time"
+
+	pb "github.com/jonathanwei/fproxy/proto"
 )
 
 func proxyTCPConn(from net.Conn, toAddr string) {
@@ -68,26 +68,9 @@ func proxyTCP(from string, to string) {
 	}
 }
 
-func runTCPProxy(configPath string) {
-	var config struct {
-		Routes []struct {
-			Listen string `json:"listen"`
-			Dial   string `json:"dial"`
-		} `json:"routes"`
-	}
-
-	jsonBlob, err := ioutil.ReadFile(configPath)
-	if err != nil {
-		log.Fatalf("JSON config file couldn't be read: %v", err)
-	}
-
-	err = json.Unmarshal(jsonBlob, &config)
-	if err != nil {
-		log.Fatalf("JSON config was malformed: %v", err)
-	}
-
+func runTCPProxy(routes []*pb.TCPProxyRoute) {
 	var wg sync.WaitGroup
-	for _, route := range config.Routes {
+	for _, route := range routes {
 		route := route
 		wg.Add(1)
 		go func() {

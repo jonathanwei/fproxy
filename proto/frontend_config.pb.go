@@ -26,7 +26,7 @@ type FrontendConfig struct {
 func (m *FrontendConfig) Reset()                    { *m = FrontendConfig{} }
 func (m *FrontendConfig) String() string            { return proto1.CompactTextString(m) }
 func (*FrontendConfig) ProtoMessage()               {}
-func (*FrontendConfig) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (*FrontendConfig) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 func (m *FrontendConfig) GetTcpProxyRoute() []*TCPProxyRoute {
 	if m != nil {
@@ -45,14 +45,14 @@ type TCPProxyRoute struct {
 func (m *TCPProxyRoute) Reset()                    { *m = TCPProxyRoute{} }
 func (m *TCPProxyRoute) String() string            { return proto1.CompactTextString(m) }
 func (*TCPProxyRoute) ProtoMessage()               {}
-func (*TCPProxyRoute) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
+func (*TCPProxyRoute) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func init() {
 	proto1.RegisterType((*FrontendConfig)(nil), "fproxy.FrontendConfig")
 	proto1.RegisterType((*TCPProxyRoute)(nil), "fproxy.TCPProxyRoute")
 }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor4 = []byte{
 	// 198 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x92, 0x2e, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x4f, 0x2b, 0xca, 0xcf, 0x2b, 0x49, 0xcd, 0x4b, 0x89, 0x4f, 0xce, 0xcf, 0x4b, 0xcb,

@@ -29,13 +29,13 @@ type FileInfo struct {
 func (m *FileInfo) Reset()                    { *m = FileInfo{} }
 func (m *FileInfo) String() string            { return proto1.CompactTextString(m) }
 func (*FileInfo) ProtoMessage()               {}
-func (*FileInfo) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*FileInfo) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
 
 func init() {
 	proto1.RegisterType((*FileInfo)(nil), "fproxy.FileInfo")
 }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor3 = []byte{
 	// 168 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x12, 0x2b, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x4f, 0xcb, 0xcc, 0x49, 0x2d, 0xae, 0x2c, 0x2e, 0x49, 0xcd, 0xd5, 0x03, 0x0b, 0x08,

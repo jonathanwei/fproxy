@@ -70,6 +70,10 @@ type backendServer struct {
 }
 
 func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
+	// TODO: use this with ACLs.
+	authCookie := GetAuthCookie(stream.Context())
+	glog.Infof("Got auth cookie: %v", authCookie)
+
 	firstReq, err := stream.Recv()
 	if err != nil {
 		glog.Warningf("Failed to read initial request: %v", err)

@@ -6,5 +6,7 @@ option go_package = "proto";
 
 message BackendConfig {
   string server_addr = 1;
+
+  string serve_path = 2;
 }
 

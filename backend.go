@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"google.golang.org/grpc"
-
-	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
@@ -28,6 +29,10 @@ Supported fields in the config are listed below.
 
 server_addr: this field lets you set the address to listen on. A sample clause:
   server_addr: ":10000"
+
+serve_path: this required field lets you set the root path to serve files from.
+A sample clause:
+  serve_path: "/home/foo/bar/"
 `),
 	Action: func(c *cli.Context) {
 		runBe(defaultConfigPath(c, "backend.textproto"))
@@ -38,6 +43,10 @@ func runBe(configPath string) {
 	var config pb.BackendConfig
 	readConfig(configPath, &config)
 
+	if config.ServePath == "" {
+		glog.Fatal("No serving path was given in config.serve_path.")
+	}
+
 	l, err := net.Listen("tcp", config.ServerAddr)
 	if err != nil {
 		glog.Fatalf("Failed to listen on %v: %v", config.ServerAddr, err)
@@ -47,82 +56,159 @@ func runBe(configPath string) {
 	glog.Infof("Listening for requests on %v", l.Addr())
 
 	s := grpc.NewServer()
-	pb.RegisterBackendServer(s, &backendServer{})
+	pb.RegisterBackendServer(s, &backendServer{
+		fs: http.Dir(config.ServePath),
+	})
 	err = s.Serve(l)
 	if err != nil {
 		glog.Fatalf("Failed to serve on %v: %v", config.ServerAddr, err)
 	}
 }
 
-type backendServer struct{}
-
-func (b *backendServer) GetNode(ctx context.Context, req *pb.GetNodeRequest) (*pb.GetNodeResponse, error) {
-	node, err := getNodeFromPath(req.Path)
-	if err != nil {
-		return nil, err
-	}
-
-	return &pb.GetNodeResponse{Node: node}, nil
+type backendServer struct {
+	fs http.FileSystem
 }
 
-func getNodeFromPath(path string) (*pb.Node, error) {
-	path = filepath.Clean("/" + path)
-
-	// TODO: take the base directory from the config instead of always using ".".
-	path = filepath.Join(".", path)
-
-	if lg := glog.V(2); lg {
-		lg.Infof("Fetching path %q", path)
-	}
-
-	f, err := os.Open(path)
+func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
+	firstReq, err := stream.Recv()
 	if err != nil {
-		return nil, err
+		glog.Warningf("Failed to read initial request: %v", err)
+		return err
 	}
 
-	finfo, err := f.Stat()
+	path := filepath.Clean("/" + firstReq.Path)
+	file, err := b.fs.Open(path)
 	if err != nil {
-		return nil, err
+		glog.Warningf("Error opening file: %v", err)
+		return err
 	}
+	defer file.Close()
 
-	node, err := getNodeFromFileInfo(finfo)
-	if err != nil || node.Kind == pb.Node_FILE {
-		return node, err
-	}
-
-	chinfos, err := f.Readdir(-1)
+	finfo, err := file.Stat()
 	if err != nil {
-		return nil, err
+		glog.Warningf("Error stating file: %v", err)
+		return err
 	}
 
-	for _, chinfo := range chinfos {
-		chnode, err := getNodeFromFileInfo(chinfo)
+	var firstResp pb.OpenResponse
+	firstResp.Info = fileInfoToProto(finfo)
+
+	if finfo.IsDir() {
+		chinfos, err := file.Readdir(-1)
 		if err != nil {
-			glog.Warningf("Got error traversing dir: %v", err)
-			continue
+			glog.Warningf("Error reading directory: %v", err)
+			return err
 		}
 
-		node.Child = append(node.Child, chnode)
+		for _, chinfo := range chinfos {
+			firstResp.Child = append(firstResp.Child, fileInfoToProto(chinfo))
+		}
 	}
 
-	return node, nil
+	err = stream.Send(&firstResp)
+	if err != nil {
+		glog.Warningf("Error sending first response: %v", err)
+		return err
+	}
+
+	// If this is a directory, then we've already yielded all metainfo above;
+	// return immediately.
+	if finfo.IsDir() {
+		return nil
+	}
+
+	// Otherwise, this is a file so we should wait for further requests for data.
+	for {
+		req, err := stream.Recv()
+
+		if err == io.EOF {
+			return nil
+		}
+
+		if err != nil {
+			glog.Warningf("Unexpected stream error: %v", err)
+			return err
+		}
+
+		var resp pb.OpenResponse
+
+		// Handle a seek request.
+		if req.SeekType != pb.OpenRequest_CUR || req.SeekOffsetBytes != 0 {
+			newOffset, err := file.Seek(req.SeekOffsetBytes, protoWhenceToOSWhence(req.SeekType))
+			if err != nil {
+				glog.Warningf("Got seek error: %v", err)
+				return err
+			}
+			resp.NewOffset = newOffset
+		} else if req.RequestedBytes > 0 {
+			// Bound the request to 1MB. The conversion to int is safe as it's int32
+			// to int, which will always fit.
+			const maxSize = 1 << 20
+			size := int(req.RequestedBytes)
+			if size > maxSize {
+				size = maxSize
+			}
+
+			// Perform the read.
+			buf := getBuf(int(size))
+			n, err := file.Read(buf)
+
+			if n > 0 && err == io.EOF {
+				err = nil
+			}
+
+			if err == io.EOF {
+				return grpc.Errorf(codes.OutOfRange, "EOF")
+			}
+
+			if err != nil {
+				glog.Warningf("Failed to read file: %v", err)
+				return err
+			}
+			resp.ResponseBytes = buf[:n]
+		} else {
+			err := grpc.Errorf(codes.InvalidArgument, "Unknown request: %v", req)
+			glog.Warning(err)
+			return err
+		}
+
+		err = stream.Send(&resp)
+		if err != nil {
+			glog.Warningf("Error sending response: %v", err)
+			return err
+		}
+	}
+
+	return nil
 }
 
-func getNodeFromFileInfo(finfo os.FileInfo) (*pb.Node, error) {
-	if finfo.Mode().IsRegular() {
-		return &pb.Node{
-			Name:      finfo.Name(),
-			Kind:      pb.Node_FILE,
-			SizeBytes: finfo.Size(),
-		}, nil
+func protoWhenceToOSWhence(seekType pb.OpenRequest_SeekType) int {
+	switch seekType {
+	case pb.OpenRequest_CUR:
+		return os.SEEK_CUR
+	case pb.OpenRequest_START_OF_FILE:
+		return os.SEEK_SET
+	case pb.OpenRequest_END_OF_FILE:
+		return os.SEEK_END
+	default:
+		panic(fmt.Sprintf("Got unknown seekType: %v", seekType))
 	}
+}
 
-	if finfo.Mode().IsDir() {
-		return &pb.Node{
-			Name: finfo.Name(),
-			Kind: pb.Node_DIR,
-		}, nil
+func fileInfoToProto(finfo os.FileInfo) *pb.FileInfo {
+	return &pb.FileInfo{
+		Name:             finfo.Name(),
+		SizeBytes:        finfo.Size(),
+		Mode:             uint32(finfo.Mode()),
+		LastModTimeNanos: finfo.ModTime().UnixNano(),
 	}
+}
 
-	return nil, fmt.Errorf("File wasn't a dir or a regular file: %v", finfo.Mode())
+func getBuf(size int) []byte {
+	// TODO: use a sync.Pool.
+	return make([]byte, size)
+}
+
+func putBuf(b []byte) {
+	// TODO: put into a sync.Pool.
 }

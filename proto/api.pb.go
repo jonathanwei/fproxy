@@ -12,10 +12,10 @@ It is generated from these files:
 	proto/frontend_config.proto
 
 It has these top-level messages:
-	GetNodeRequest
-	GetNodeResponse
+	OpenRequest
+	OpenResponse
 	BackendConfig
-	Node
+	FileInfo
 	FrontendConfig
 	TCPProxyRoute
 */
@@ -39,35 +39,80 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 const _ = proto1.ProtoPackageIsVersion1
 
-type GetNodeRequest struct {
-	Path string `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+// The following will be set for all subsequent messages from the client to
+// the server.
+type OpenRequest_SeekType int32
+
+const (
+	OpenRequest_CUR           OpenRequest_SeekType = 0
+	OpenRequest_START_OF_FILE OpenRequest_SeekType = 1
+	OpenRequest_END_OF_FILE   OpenRequest_SeekType = 2
+)
+
+var OpenRequest_SeekType_name = map[int32]string{
+	0: "CUR",
+	1: "START_OF_FILE",
+	2: "END_OF_FILE",
+}
+var OpenRequest_SeekType_value = map[string]int32{
+	"CUR":           0,
+	"START_OF_FILE": 1,
+	"END_OF_FILE":   2,
 }
 
-func (m *GetNodeRequest) Reset()                    { *m = GetNodeRequest{} }
-func (m *GetNodeRequest) String() string            { return proto1.CompactTextString(m) }
-func (*GetNodeRequest) ProtoMessage()               {}
-func (*GetNodeRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (x OpenRequest_SeekType) String() string {
+	return proto1.EnumName(OpenRequest_SeekType_name, int32(x))
+}
+func (OpenRequest_SeekType) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0} }
 
-type GetNodeResponse struct {
-	// The meta information about the requested node and its children, if any.
-	Node *Node `protobuf:"bytes,1,opt,name=node" json:"node,omitempty"`
+type OpenRequest struct {
+	// Will be set for the first message from client to server. Represents the
+	// path to Open.
+	Path            string               `protobuf:"bytes,1,opt,name=path" json:"path,omitempty"`
+	SeekType        OpenRequest_SeekType `protobuf:"varint,2,opt,name=seek_type,enum=fproxy.OpenRequest_SeekType" json:"seek_type,omitempty"`
+	SeekOffsetBytes int64                `protobuf:"varint,3,opt,name=seek_offset_bytes" json:"seek_offset_bytes,omitempty"`
+	RequestedBytes  int32                `protobuf:"varint,4,opt,name=requested_bytes" json:"requested_bytes,omitempty"`
 }
 
-func (m *GetNodeResponse) Reset()                    { *m = GetNodeResponse{} }
-func (m *GetNodeResponse) String() string            { return proto1.CompactTextString(m) }
-func (*GetNodeResponse) ProtoMessage()               {}
-func (*GetNodeResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (m *OpenRequest) Reset()                    { *m = OpenRequest{} }
+func (m *OpenRequest) String() string            { return proto1.CompactTextString(m) }
+func (*OpenRequest) ProtoMessage()               {}
+func (*OpenRequest) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
-func (m *GetNodeResponse) GetNode() *Node {
+type OpenResponse struct {
+	// Set on the first server->client message only.
+	Info *FileInfo `protobuf:"bytes,1,opt,name=info" json:"info,omitempty"`
+	// Set on the first server->client message if the opened path is a directory.
+	Child []*FileInfo `protobuf:"bytes,2,rep,name=child" json:"child,omitempty"`
+	// Set in response to a seek.
+	NewOffset int64 `protobuf:"varint,3,opt,name=new_offset" json:"new_offset,omitempty"`
+	// Set on subsequent server->client messages.
+	ResponseBytes []byte `protobuf:"bytes,4,opt,name=response_bytes,proto3" json:"response_bytes,omitempty"`
+}
+
+func (m *OpenResponse) Reset()                    { *m = OpenResponse{} }
+func (m *OpenResponse) String() string            { return proto1.CompactTextString(m) }
+func (*OpenResponse) ProtoMessage()               {}
+func (*OpenResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *OpenResponse) GetInfo() *FileInfo {
 	if m != nil {
-		return m.Node
+		return m.Info
+	}
+	return nil
+}
+
+func (m *OpenResponse) GetChild() []*FileInfo {
+	if m != nil {
+		return m.Child
 	}
 	return nil
 }
 
 func init() {
-	proto1.RegisterType((*GetNodeRequest)(nil), "fproxy.GetNodeRequest")
-	proto1.RegisterType((*GetNodeResponse)(nil), "fproxy.GetNodeResponse")
+	proto1.RegisterType((*OpenRequest)(nil), "fproxy.OpenRequest")
+	proto1.RegisterType((*OpenResponse)(nil), "fproxy.OpenResponse")
+	proto1.RegisterEnum("fproxy.OpenRequest_SeekType", OpenRequest_SeekType_name, OpenRequest_SeekType_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -77,8 +122,8 @@ var _ grpc.ClientConn
 // Client API for Backend service
 
 type BackendClient interface {
-	// Gets a node's meta information from the backend.
-	GetNode(ctx context.Context, in *GetNodeRequest, opts ...grpc.CallOption) (*GetNodeResponse, error)
+	// TODO: describe the client-server protocol.
+	Open(ctx context.Context, opts ...grpc.CallOption) (Backend_OpenClient, error)
 }
 
 type backendClient struct {
@@ -89,61 +134,110 @@ func NewBackendClient(cc *grpc.ClientConn) BackendClient {
 	return &backendClient{cc}
 }
 
-func (c *backendClient) GetNode(ctx context.Context, in *GetNodeRequest, opts ...grpc.CallOption) (*GetNodeResponse, error) {
-	out := new(GetNodeResponse)
-	err := grpc.Invoke(ctx, "/fproxy.Backend/GetNode", in, out, c.cc, opts...)
+func (c *backendClient) Open(ctx context.Context, opts ...grpc.CallOption) (Backend_OpenClient, error) {
+	stream, err := grpc.NewClientStream(ctx, &_Backend_serviceDesc.Streams[0], c.cc, "/fproxy.Backend/Open", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &backendOpenClient{stream}
+	return x, nil
+}
+
+type Backend_OpenClient interface {
+	Send(*OpenRequest) error
+	Recv() (*OpenResponse, error)
+	grpc.ClientStream
+}
+
+type backendOpenClient struct {
+	grpc.ClientStream
+}
+
+func (x *backendOpenClient) Send(m *OpenRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *backendOpenClient) Recv() (*OpenResponse, error) {
+	m := new(OpenResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // Server API for Backend service
 
 type BackendServer interface {
-	// Gets a node's meta information from the backend.
-	GetNode(context.Context, *GetNodeRequest) (*GetNodeResponse, error)
+	// TODO: describe the client-server protocol.
+	Open(Backend_OpenServer) error
 }
 
 func RegisterBackendServer(s *grpc.Server, srv BackendServer) {
 	s.RegisterService(&_Backend_serviceDesc, srv)
 }
 
-func _Backend_GetNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(GetNodeRequest)
-	if err := dec(in); err != nil {
+func _Backend_Open_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(BackendServer).Open(&backendOpenServer{stream})
+}
+
+type Backend_OpenServer interface {
+	Send(*OpenResponse) error
+	Recv() (*OpenRequest, error)
+	grpc.ServerStream
+}
+
+type backendOpenServer struct {
+	grpc.ServerStream
+}
+
+func (x *backendOpenServer) Send(m *OpenResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *backendOpenServer) Recv() (*OpenRequest, error) {
+	m := new(OpenRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	out, err := srv.(BackendServer).GetNode(ctx, in)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
+	return m, nil
 }
 
 var _Backend_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "fproxy.Backend",
 	HandlerType: (*BackendServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "GetNode",
-			Handler:    _Backend_GetNode_Handler,
+			StreamName:    "Open",
+			Handler:       _Backend_Open_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
-	Streams: []grpc.StreamDesc{},
 }
 
 var fileDescriptor0 = []byte{
-	// 167 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0x2f, 0x28, 0xca, 0x2f,
-	0xc9, 0xd7, 0x4f, 0x2c, 0xc8, 0xd4, 0x03, 0xb3, 0x84, 0xd8, 0xd2, 0x80, 0x74, 0x45, 0xa5, 0x94,
-	0x18, 0x44, 0x22, 0x2d, 0x33, 0x27, 0xb5, 0xb8, 0xb2, 0xb8, 0x24, 0x35, 0x17, 0x22, 0xaf, 0xa4,
-	0xc2, 0xc5, 0xe7, 0x9e, 0x5a, 0xe2, 0x97, 0x9f, 0x92, 0x1a, 0x94, 0x5a, 0x58, 0x9a, 0x5a, 0x5c,
-	0x22, 0x24, 0xc4, 0xc5, 0x52, 0x90, 0x58, 0x92, 0x21, 0xc1, 0xa8, 0xc0, 0xa8, 0xc1, 0x19, 0x04,
-	0x66, 0x2b, 0x19, 0x73, 0xf1, 0xc3, 0x55, 0x15, 0x17, 0xe4, 0xe7, 0x15, 0xa7, 0x0a, 0x29, 0x70,
-	0xb1, 0xe4, 0x01, 0xf9, 0x60, 0x65, 0xdc, 0x46, 0x3c, 0x7a, 0x10, 0x7b, 0xf4, 0xc0, 0x6a, 0xc0,
-	0x32, 0x46, 0xae, 0x5c, 0xec, 0x4e, 0x89, 0xc9, 0xd9, 0xa9, 0x79, 0x29, 0x42, 0x56, 0x5c, 0xec,
-	0x50, 0xfd, 0x42, 0x62, 0x30, 0x95, 0xa8, 0xd6, 0x4a, 0x89, 0x63, 0x88, 0x43, 0x2c, 0x72, 0x62,
-	0x8f, 0x62, 0x05, 0x3b, 0x35, 0x89, 0x0d, 0x4c, 0x19, 0x03, 0x02, 0x00, 0x00, 0xff, 0xff, 0xf3,
-	0x5f, 0xfa, 0x93, 0xe4, 0x00, 0x00, 0x00,
+	// 349 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0x6c, 0x91, 0x5b, 0x4b, 0x3a, 0x41,
+	0x18, 0xc6, 0xff, 0xeb, 0xae, 0xa7, 0xd7, 0xc3, 0xea, 0xfb, 0x8f, 0x10, 0x29, 0x08, 0xe9, 0x20,
+	0x5d, 0x6c, 0x61, 0x44, 0x74, 0x57, 0x96, 0x82, 0x10, 0x09, 0xa3, 0xdd, 0x74, 0xb3, 0x78, 0x78,
+	0x17, 0x17, 0x6d, 0x77, 0x73, 0x26, 0x6a, 0xbf, 0x4e, 0x1f, 0xaf, 0x4f, 0xd1, 0x38, 0xb3, 0x8a,
+	0x81, 0x57, 0xf3, 0xf2, 0x3c, 0xcf, 0x3c, 0x33, 0xbf, 0x19, 0xb0, 0xa3, 0x65, 0x28, 0xc2, 0x8b,
+	0x51, 0xe4, 0x3b, 0x6a, 0xc2, 0x8c, 0x27, 0xd7, 0xaf, 0xb8, 0xbe, 0xaf, 0x0d, 0xcf, 0x5f, 0x10,
+	0x8f, 0xb9, 0xa0, 0x37, 0xed, 0x37, 0x7e, 0x0c, 0x28, 0xf4, 0x23, 0x0a, 0x18, 0xbd, 0x7f, 0x10,
+	0x17, 0x88, 0x60, 0x45, 0x23, 0x31, 0xab, 0x19, 0x47, 0x46, 0x33, 0xcf, 0xd4, 0x8c, 0xb7, 0x90,
+	0xe7, 0x44, 0x73, 0x57, 0xc4, 0x11, 0xd5, 0x52, 0xd2, 0x28, 0xb7, 0x0e, 0x1c, 0xdd, 0xeb, 0x6c,
+	0xed, 0x75, 0x06, 0x32, 0x34, 0x94, 0x19, 0x96, 0xe3, 0xc9, 0x84, 0xe7, 0x50, 0x55, 0x5b, 0x43,
+	0xcf, 0xe3, 0x24, 0xdc, 0x71, 0x2c, 0x88, 0xd7, 0x4c, 0x59, 0x61, 0x32, 0x7b, 0x65, 0xf4, 0x95,
+	0xde, 0x5e, 0xc9, 0x78, 0x06, 0xf6, 0x52, 0x37, 0xd1, 0x34, 0x49, 0x5a, 0x32, 0x99, 0x66, 0xe5,
+	0x8d, 0xac, 0x82, 0x8d, 0x1b, 0xc8, 0xad, 0x8f, 0xc2, 0x2c, 0x98, 0x0f, 0x2f, 0xac, 0xf2, 0x0f,
+	0xab, 0x50, 0x1a, 0x0c, 0xef, 0xd9, 0xd0, 0xed, 0x77, 0xdd, 0x6e, 0xef, 0xa9, 0x53, 0x31, 0xd0,
+	0x86, 0x42, 0xe7, 0xf9, 0x71, 0x23, 0xa4, 0x1a, 0xdf, 0x06, 0x14, 0xf5, 0x85, 0x79, 0x14, 0x06,
+	0x9c, 0xf0, 0x18, 0x2c, 0x3f, 0xf0, 0x42, 0x45, 0x5b, 0x68, 0x55, 0xd6, 0x50, 0x5d, 0xf9, 0x4a,
+	0x3d, 0xa9, 0x33, 0xe5, 0xe2, 0x29, 0xa4, 0x27, 0x33, 0x7f, 0x31, 0x95, 0xec, 0xe6, 0xce, 0x98,
+	0xb6, 0xf1, 0x10, 0x20, 0xa0, 0xcf, 0x84, 0x35, 0xa1, 0xcc, 0x4b, 0x45, 0x43, 0xe2, 0x09, 0x48,
+	0x10, 0x7d, 0xf0, 0x16, 0x5e, 0x91, 0x95, 0xd6, 0xaa, 0xa2, 0x6b, 0xdd, 0x41, 0xb6, 0x3d, 0x9a,
+	0xcc, 0x29, 0x98, 0xe2, 0x35, 0x58, 0xab, 0xeb, 0xe2, 0xff, 0x1d, 0xaf, 0x5d, 0xdf, 0xfb, 0x2b,
+	0xea, 0x8a, 0xa6, 0x71, 0x69, 0xb4, 0xb3, 0xaf, 0x69, 0xf5, 0xb9, 0xe3, 0x8c, 0x5a, 0xae, 0x7e,
+	0x03, 0x00, 0x00, 0xff, 0xff, 0xdc, 0x40, 0x76, 0xb9, 0x16, 0x02, 0x00, 0x00,
 }

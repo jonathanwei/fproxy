@@ -7,15 +7,38 @@ import "proto/filesystem.proto";
 option go_package = "proto";
 
 service Backend {
-  // Gets a node's meta information from the backend.
-  rpc GetNode(GetNodeRequest) returns (GetNodeResponse);
+  // TODO: describe the client-server protocol.
+  rpc Open(stream OpenRequest) returns (stream OpenResponse);
 }
 
-message GetNodeRequest {
+message OpenRequest {
+  // Will be set for the first message from client to server. Represents the
+  // path to Open.
   string path = 1;
+
+  // The following will be set for all subsequent messages from the client to
+  // the server.
+  enum SeekType {
+    CUR = 0;
+    START_OF_FILE = 1;
+    END_OF_FILE = 2;
+  }
+  SeekType seek_type = 2;
+  int64 seek_offset_bytes = 3;
+
+  int32 requested_bytes = 4;
 }
 
-message GetNodeResponse {
-  // The meta information about the requested node and its children, if any.
-  fproxy.Node node = 1;
+message OpenResponse {
+  // Set on the first server->client message only.
+  FileInfo info = 1;
+
+  // Set on the first server->client message if the opened path is a directory.
+  repeated FileInfo child = 2;
+
+  // Set in response to a seek.
+  int64 new_offset = 3;
+
+  // Set on subsequent server->client messages.
+  bytes response_bytes = 4;
 }

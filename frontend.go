@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"io/ioutil"
 	"strings"
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
@@ -53,6 +57,19 @@ email to the user ID for use in ACLs. A sample clause:
     key: "email@example.com",
     value: "user1",
   }
+
+backend: this field is used to store all configuration for the backend server
+we connect to. This includes the address it's located at, the root CA to use
+for it, the client certificate and key with which to identify the frontend
+server, and the server name for the backend. A sample clause:
+
+backend {
+  addr: ":10000"
+  root_ca_file: "/certs/backend/ca.pem"
+  client_cert_file: "/certs/frontend/frontend.pem"
+  client_key_file: "/certs/frontend/frontend-key.pem"
+  server_name: "backend.fproxy"
+}
 `),
 	Action: func(c *cli.Context) {
 		runFe(defaultConfigPath(c, "frontend.textproto"))
@@ -75,7 +92,7 @@ func runFe(configPath string) {
 		runTCPProxy(config.TcpProxyRoute)
 	}()
 
-	conn, err := grpc.Dial(config.BackendAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(config.Backend.Addr, grpc.WithTransportCredentials(getFeTLS(&config)))
 	if err != nil {
 		glog.Warningf("Couldn't connect to backend: %v", err)
 	}
@@ -90,4 +107,29 @@ func runFe(configPath string) {
 	}()
 
 	wg.Wait()
+}
+
+func getFeTLS(config *pb.FrontendConfig) credentials.TransportAuthenticator {
+	backend := config.Backend
+	cert, err := tls.LoadX509KeyPair(backend.ClientCertFile, backend.ClientKeyFile)
+	if err != nil {
+		glog.Fatalf("Couldn't load frontend certificate and key: %v", err)
+	}
+
+	rootCAPemBytes, err := ioutil.ReadFile(backend.RootCaFile)
+	if err != nil {
+		glog.Fatalf("Couldn't read backend CA certificate: %v", err)
+	}
+	rootCAs := x509.NewCertPool()
+	ok := rootCAs.AppendCertsFromPEM(rootCAPemBytes)
+	if !ok {
+		glog.Fatal("Unable to append backend CA certificate to root CA pool.")
+	}
+
+	return credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      rootCAs,
+		ServerName:   backend.ServerName,
+		MinVersion:   tls.VersionTLS12,
+	})
 }

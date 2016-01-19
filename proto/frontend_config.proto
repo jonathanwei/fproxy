@@ -6,8 +6,17 @@ option go_package = "proto";
 
 message FrontendConfig {
   repeated TCPProxyRoute tcp_proxy_route = 1;
+
   // TODO: make this repeated.
-  string backend_addr = 2;
+  message Backend {
+    string addr = 1;
+    string root_ca_file = 2;
+    string client_cert_file = 3;
+    string client_key_file = 4;
+    string server_name = 5;
+  }
+  Backend backend = 2;
+
   string http_addr = 3;
   OauthConfig oauth_config = 4;
   bytes auth_cookie_key = 5;

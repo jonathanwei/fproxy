@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -11,6 +14,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
@@ -27,8 +31,16 @@ The default path for the config proto is "~/.config/fproxy/backend.textproto".
 
 Supported fields in the config are listed below.
 
-server_addr: this field lets you set the address to listen on. A sample clause:
-  server_addr: ":10000"
+server: this field is used to store all configuration for the RPC server that
+we run. This includes the address it's located at, the certificate it presents
+to clients (and the associated private key), and the CA it uses to verify
+client certificates. A sample clause:
+  server {
+    addr: ":10000"
+    cert_file: "/certs/backend/backend.pem"
+    key_file: "/certs/backend/backend-key.pem"
+    client_ca_file: "/certs/frontend/ca.pem"
+  }
 
 serve_path: this required field lets you set the root path to serve files from.
 A sample clause:
@@ -47,21 +59,21 @@ func runBe(configPath string) {
 		glog.Fatal("No serving path was given in config.serve_path.")
 	}
 
-	l, err := net.Listen("tcp", config.ServerAddr)
+	l, err := net.Listen("tcp", config.Server.Addr)
 	if err != nil {
-		glog.Fatalf("Failed to listen on %v: %v", config.ServerAddr, err)
+		glog.Fatalf("Failed to listen on %v: %v", config.Server.Addr, err)
 	}
 	defer l.Close()
 
 	glog.Infof("Listening for requests on %v", l.Addr())
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.Creds(getBeTLS(&config)))
 	pb.RegisterBackendServer(s, &backendServer{
 		fs: http.Dir(config.ServePath),
 	})
 	err = s.Serve(l)
 	if err != nil {
-		glog.Fatalf("Failed to serve on %v: %v", config.ServerAddr, err)
+		glog.Fatalf("Failed to serve on %v: %v", config.Server.Addr, err)
 	}
 }
 
@@ -215,4 +227,30 @@ func getBuf(size int) []byte {
 
 func putBuf(b []byte) {
 	// TODO: put into a sync.Pool.
+}
+
+func getBeTLS(config *pb.BackendConfig) credentials.TransportAuthenticator {
+	server := config.Server
+
+	cert, err := tls.LoadX509KeyPair(server.CertFile, server.KeyFile)
+	if err != nil {
+		glog.Fatalf("Couldn't load backend certificate and key: %v", err)
+	}
+
+	clientCAPemBytes, err := ioutil.ReadFile(server.ClientCaFile)
+	if err != nil {
+		glog.Fatalf("Couldn't read frontend CA certificate: %v", err)
+	}
+	clientCAs := x509.NewCertPool()
+	ok := clientCAs.AppendCertsFromPEM(clientCAPemBytes)
+	if !ok {
+		glog.Fatal("Unable to append frontend CA certificate to client CA pool.")
+	}
+
+	return credentials.NewTLS(&tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    clientCAs,
+		MinVersion:   tls.VersionTLS12,
+	})
 }

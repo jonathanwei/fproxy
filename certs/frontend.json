@@ -1,0 +1,18 @@
+{
+  "hosts": [
+    "frontend.fproxy"
+  ],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "San Francisco",
+      "O": "My Awesome Company",
+      "OU": "Data Services",
+      "ST": "California"
+    }
+  ]
+}

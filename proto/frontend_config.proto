@@ -5,21 +5,21 @@ package fproxy;
 option go_package = "proto";
 
 message FrontendConfig {
-  // Configuration for the frontend's TCP proxy. Can be left unset if a TCP
-  // proxy is not required.
   repeated TCPProxyRoute tcp_proxy_route = 1;
-
   // TODO: make this repeated.
   string backend_addr = 2;
-
-  // The address to listen on for HTTP requests.
   string http_addr = 3;
+  OauthConfig oauth_config = 4;
+  bytes auth_cookie_key = 5;
 }
 
 message TCPProxyRoute {
-  // Address to listen on.
   string listen = 1;
-
-  // Address to proxy connections to.
   string dial = 2;
+}
+
+message OauthConfig {
+  string client_id = 1;
+  string client_secret = 2;
+  string redirect_url = 3;
 }

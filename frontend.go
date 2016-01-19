@@ -32,6 +32,19 @@ dialing address for proxying. A sample clause:
 http_addr: this field lets you set the address to listen on for serving HTTP
 requests. A sample clause:
   http_addr: ":8000"
+
+oauth_config: this field lets you configure the oauth settings for
+authentication. It requires the client ID, client secret, and redirect URL to
+be set. Currently, only Google oauth is supported. Note that the redirect URL
+must always use the path '/oauth2Callback'. A sample clause:
+  oauth_config {
+    client_id: "thisisanid.apps.googleusercontent.com"
+    client_secret: "thisis-a-clientsecret"
+    redirect_url: "http://localhost:8000/oauth2Callback"
+  }
+
+auth_cookie_key: this field is used as a key for encrypting and authenticating auth cookies. It must be a 16 byte string. A sample clause:
+  auth_cookie_key: "1234567890123456"
 `),
 	Action: func(c *cli.Context) {
 		runFe(defaultConfigPath(c, "frontend.textproto"))
@@ -61,7 +74,7 @@ func runFe(configPath string) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runHttpServer(config.HttpAddr, backendClient)
+		runHttpServer(&config, backendClient)
 	}()
 
 	wg.Wait()

@@ -21,6 +21,7 @@ It has these top-level messages:
 	FileInfo
 	FrontendConfig
 	TCPProxyRoute
+	OauthConfig
 */
 package proto
 

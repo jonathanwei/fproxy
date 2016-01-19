@@ -13,31 +13,35 @@ import (
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
-var oauthCfg = &oauth2.Config{
-	Endpoint: google.Endpoint,
+func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
 
-	// TODO: get this from config.
-	RedirectURL: "http://localhost:8000/oauth2Callback",
+	crypter := newCookieCrypter(config.AuthCookieKey)
 
-	Scopes: []string{"email"},
-}
+	var oauthCfg = &oauth2.Config{
+		ClientID:     config.OauthConfig.ClientId,
+		ClientSecret: config.OauthConfig.ClientSecret,
 
-func runHttpServer(serverAddr string, client pb.BackendClient) {
-	crypter := newCookieCrypter([]byte("0000000000000000")) // TODO: get this from config
+		Endpoint: google.Endpoint,
+
+		RedirectURL: config.OauthConfig.RedirectUrl,
+
+		Scopes: []string{"email"},
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/", &feHandler{
-		crypter: crypter,
-		client:  client,
+		crypter:  crypter,
+		client:   client,
+		oauthCfg: oauthCfg,
 	})
-	mux.Handle("/oauth2Callback", oauthHandler{crypter})
-	glog.Warning(http.ListenAndServe(serverAddr, mux))
+	mux.Handle("/oauth2Callback", oauthHandler{crypter, oauthCfg})
+	glog.Warning(http.ListenAndServe(config.HttpAddr, mux))
 }
 
 type feHandler struct {
-	crypter cookieCrypter
-
-	client pb.BackendClient
+	crypter  cookieCrypter
+	client   pb.BackendClient
+	oauthCfg *oauth2.Config
 }
 
 func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -59,7 +63,7 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	cookie := f.crypter.GetAuthCookie(req)
 	if cookie == nil {
-		url := oauthCfg.AuthCodeURL(req.URL.Path)
+		url := f.oauthCfg.AuthCodeURL(req.URL.Path)
 		http.Redirect(rw, req, url, http.StatusFound)
 		return
 	}
@@ -70,18 +74,19 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 type oauthHandler struct {
 	crypter cookieCrypter
+	cfg     *oauth2.Config
 }
 
 func (o oauthHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	code := req.FormValue("code")
 
-	t, err := oauthCfg.Exchange(context.TODO(), code)
+	t, err := o.cfg.Exchange(context.TODO(), code)
 	if err != nil {
 		glog.Warningf("Got error: %v", err)
 		panic("foo")
 	}
 
-	httpClient := oauthCfg.Client(context.TODO(), t)
+	httpClient := o.cfg.Client(context.TODO(), t)
 
 	oauth2Service, err := goauth2.New(httpClient)
 	if err != nil {

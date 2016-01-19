@@ -69,11 +69,12 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if c, ok := rw.(http.CloseNotifier); ok {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithCancel(ctx)
+		ch := c.CloseNotify()
 
 		go func() {
 			select {
 			case <-ctx.Done():
-			case <-c.CloseNotify():
+			case <-ch:
 				cancel()
 			}
 		}()

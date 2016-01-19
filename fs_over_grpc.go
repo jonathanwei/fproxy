@@ -30,7 +30,10 @@ func (g grpcFs) Open(path string) (http.File, error) {
 		return nil, err
 	}
 
-	err = stream.Send(&pb.OpenRequest{Path: path})
+	err = stream.Send(&pb.OpenRequest{
+		Action: pb.OpenRequest_INITIAL,
+		Path:   path,
+	})
 	if err != nil {
 		glog.Warningf("Couldn't send initial request: %v", err)
 		return nil, err
@@ -50,7 +53,7 @@ func (g grpcFs) Open(path string) (http.File, error) {
 		firstResp:  resp,
 
 		reader:    reader,
-		bufReader: bufio.NewReaderSize(reader, 1<<20),
+		bufReader: bufio.NewReaderSize(reader, 32000),
 	}, nil
 }
 
@@ -98,6 +101,7 @@ func (g *grpcFile) Readdir(count int) ([]os.FileInfo, error) {
 
 func (g *grpcFile) Seek(offset int64, whence int) (int64, error) {
 	err := g.stream.Send(&pb.OpenRequest{
+		Action:          pb.OpenRequest_SEEK,
 		SeekType:        osWhenceToProtoWhence(whence),
 		SeekOffsetBytes: offset,
 	})
@@ -119,7 +123,7 @@ func (g *grpcFile) Seek(offset int64, whence int) (int64, error) {
 
 func (g *grpcFile) Close() error {
 	g.cancelFunc()
-	return g.ctx.Err()
+	return nil
 }
 
 type grpcFileReader struct {
@@ -128,6 +132,7 @@ type grpcFileReader struct {
 
 func (g grpcFileReader) Read(buf []byte) (int, error) {
 	err := g.stream.Send(&pb.OpenRequest{
+		Action:         pb.OpenRequest_CONTENT,
 		RequestedBytes: int32(len(buf)),
 	})
 	if err != nil {

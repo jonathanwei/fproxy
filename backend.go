@@ -92,6 +92,12 @@ func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
 		return err
 	}
 
+	if firstReq.Action != pb.OpenRequest_INITIAL {
+		err := grpc.Errorf(codes.InvalidArgument, "Unexpected initial action: %v", firstReq)
+		glog.Warning(err)
+		return err
+	}
+
 	path := filepath.Clean("/" + firstReq.Path)
 	file, err := b.fs.Open(path)
 	if err != nil {
@@ -149,14 +155,15 @@ func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
 		var resp pb.OpenResponse
 
 		// Handle a seek request.
-		if req.SeekType != pb.OpenRequest_CUR || req.SeekOffsetBytes != 0 {
+		switch req.Action {
+		case pb.OpenRequest_SEEK:
 			newOffset, err := file.Seek(req.SeekOffsetBytes, protoWhenceToOSWhence(req.SeekType))
 			if err != nil {
 				glog.Warningf("Got seek error: %v", err)
 				return err
 			}
 			resp.NewOffset = newOffset
-		} else if req.RequestedBytes > 0 {
+		case pb.OpenRequest_CONTENT:
 			// Bound the request to 1MB. The conversion to int is safe as it's int32
 			// to int, which will always fit.
 			const maxSize = 1 << 20
@@ -182,8 +189,8 @@ func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
 				return err
 			}
 			resp.ResponseBytes = buf[:n]
-		} else {
-			err := grpc.Errorf(codes.InvalidArgument, "Unknown request: %v", req)
+		default:
+			err := grpc.Errorf(codes.InvalidArgument, "Unknown request action: %v", req)
 			glog.Warning(err)
 			return err
 		}

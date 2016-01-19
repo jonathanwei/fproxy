@@ -17,10 +17,14 @@ message FrontendConfig {
   }
   Backend backend = 2;
 
+  // TODO: group these into a nested message.
   string http_addr = 3;
-  OauthConfig oauth_config = 4;
-  bytes auth_cookie_key = 5;
-  map<string, string> email_to_user_id = 6;
+  string http_cert_file = 4;
+  string http_key_file = 5;
+
+  OauthConfig oauth_config = 6;
+  bytes auth_cookie_key = 7;
+  map<string, string> email_to_user_id = 8;
 }
 
 message TCPProxyRoute {

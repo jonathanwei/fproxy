@@ -71,7 +71,7 @@ func (c cookieCrypter) SetAuthCookie(rw http.ResponseWriter, a *pb.AuthCookie) {
 
 		Expires: time.Now().Add(365 * 24 * time.Hour),
 
-		Secure:   false, // TODO: get this from config.
+		Secure:   true, // TODO: get this from config.
 		HttpOnly: true,
 	}
 	http.SetCookie(rw, &cookie)

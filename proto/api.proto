@@ -12,9 +12,16 @@ service Backend {
 }
 
 message OpenRequest {
+  enum Action {
+    UNKNOWN = 0;
+    INITIAL = 1;
+    SEEK = 2;
+    CONTENT = 3;
+  }
+  Action action = 1;
   // Will be set for the first message from client to server. Represents the
   // path to Open.
-  string path = 1;
+  string path = 2;
 
   // The following will be set for all subsequent messages from the client to
   // the server.
@@ -23,10 +30,10 @@ message OpenRequest {
     START_OF_FILE = 1;
     END_OF_FILE = 2;
   }
-  SeekType seek_type = 2;
-  int64 seek_offset_bytes = 3;
+  SeekType seek_type = 3;
+  int64 seek_offset_bytes = 4;
 
-  int32 requested_bytes = 4;
+  int32 requested_bytes = 5;
 }
 
 message OpenResponse {

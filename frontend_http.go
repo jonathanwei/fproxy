@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net/http"
 	"time"
 
@@ -43,7 +44,16 @@ func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
 	mux.HandleFunc("/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
-	glog.Warning(http.ListenAndServe(config.HttpAddr, mux))
+
+	server := &http.Server{
+		Addr:    config.HttpAddr,
+		Handler: mux,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
+	glog.Fatal(server.ListenAndServeTLS(config.HttpCertFile, config.HttpKeyFile))
 }
 
 type feHandler struct {

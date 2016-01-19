@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -34,7 +35,14 @@ func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
 		client:   client,
 		oauthCfg: oauthCfg,
 	})
-	mux.Handle("/oauth2Callback", oauthHandler{crypter, oauthCfg})
+	mux.Handle("/oauth2Callback", oauthHandler{
+		crypter:       crypter,
+		cfg:           oauthCfg,
+		emailToUserId: config.EmailToUserId,
+	})
+	mux.HandleFunc("/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
+		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
+	})
 	glog.Warning(http.ListenAndServe(config.HttpAddr, mux))
 }
 
@@ -63,7 +71,9 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	cookie := f.crypter.GetAuthCookie(req)
 	if cookie == nil {
-		url := f.oauthCfg.AuthCodeURL(req.URL.Path)
+		// TODO: Sign state.
+		state := req.URL.Path
+		url := f.oauthCfg.AuthCodeURL(state)
 		http.Redirect(rw, req, url, http.StatusFound)
 		return
 	}
@@ -73,20 +83,24 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 type oauthHandler struct {
-	crypter cookieCrypter
-	cfg     *oauth2.Config
+	crypter       cookieCrypter
+	cfg           *oauth2.Config
+	emailToUserId map[string]string
 }
 
 func (o oauthHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	code := req.FormValue("code")
 
-	t, err := o.cfg.Exchange(context.TODO(), code)
+	t, err := o.cfg.Exchange(ctx, code)
 	if err != nil {
 		glog.Warningf("Got error: %v", err)
 		panic("foo")
 	}
 
-	httpClient := o.cfg.Client(context.TODO(), t)
+	httpClient := o.cfg.Client(ctx, t)
 
 	oauth2Service, err := goauth2.New(httpClient)
 	if err != nil {
@@ -96,7 +110,7 @@ func (o oauthHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	tokInfo, err := oauth2Service.
 		Tokeninfo().
-		Context(context.TODO()).
+		Context(ctx).
 		AccessToken(t.AccessToken).
 		Do()
 	if err != nil {
@@ -104,8 +118,12 @@ func (o oauthHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		panic("baz")
 	}
 
-	// TODO: check VerifiedEmail.
+	if uid, ok := o.emailToUserId[tokInfo.Email]; ok && tokInfo.VerifiedEmail {
+		o.crypter.SetAuthCookie(rw, &pb.AuthCookie{User: uid})
+		// TODO: verify 'state' signature.
+		http.Redirect(rw, req, req.FormValue("state"), http.StatusFound)
+		return
+	}
 
-	o.crypter.SetAuthCookie(rw, &pb.AuthCookie{User: tokInfo.Email})
-	http.Redirect(rw, req, req.FormValue("state"), http.StatusFound)
+	http.Redirect(rw, req, "/unauthorized", http.StatusFound)
 }

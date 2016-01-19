@@ -11,6 +11,7 @@ message FrontendConfig {
   string http_addr = 3;
   OauthConfig oauth_config = 4;
   bytes auth_cookie_key = 5;
+  map<string, string> email_to_user_id = 6;
 }
 
 message TCPProxyRoute {

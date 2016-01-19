@@ -43,8 +43,16 @@ must always use the path '/oauth2Callback'. A sample clause:
     redirect_url: "http://localhost:8000/oauth2Callback"
   }
 
-auth_cookie_key: this field is used as a key for encrypting and authenticating auth cookies. It must be a 16 byte string. A sample clause:
+auth_cookie_key: this field is used as a key for encrypting and authenticating
+auth cookies. It must be a 16 byte string. A sample clause:
   auth_cookie_key: "1234567890123456"
+
+email_to_user_id: this repeated field is used as a mapping between a verified
+email to the user ID for use in ACLs. A sample clause:
+  email_to_user_id {
+    key: "email@example.com",
+    value: "user1",
+  }
 `),
 	Action: func(c *cli.Context) {
 		runFe(defaultConfigPath(c, "frontend.textproto"))
@@ -54,6 +62,10 @@ auth_cookie_key: this field is used as a key for encrypting and authenticating a
 func runFe(configPath string) {
 	var config pb.FrontendConfig
 	readConfig(configPath, &config)
+
+	if len(config.EmailToUserId) == 0 {
+		glog.Error("No email to user mappings were given. The HTTP server will reject all users.")
+	}
 
 	var wg sync.WaitGroup
 

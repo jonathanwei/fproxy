@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/metadata"
@@ -67,6 +68,8 @@ func (c cookieCrypter) SetAuthCookie(rw http.ResponseWriter, a *pb.AuthCookie) {
 	cookie := http.Cookie{
 		Name:  authCookieName,
 		Value: cookieStr,
+
+		Expires: time.Now().Add(365 * 24 * time.Hour),
 
 		Secure:   false, // TODO: get this from config.
 		HttpOnly: true,

@@ -166,7 +166,7 @@ func (b *backendServer) Open(stream pb.Backend_OpenServer) error {
 		case pb.OpenRequest_CONTENT:
 			// Bound the request to 1MB. The conversion to int is safe as it's int32
 			// to int, which will always fit.
-			const maxSize = 1 << 20
+			const maxSize = 32000
 			size := int(req.RequestedBytes)
 			if size > maxSize {
 				size = maxSize

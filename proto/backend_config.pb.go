@@ -2,6 +2,24 @@
 // source: proto/backend_config.proto
 // DO NOT EDIT!
 
+/*
+Package proto is a generated protocol buffer package.
+
+It is generated from these files:
+	proto/backend_config.proto
+	proto/cookie.proto
+	proto/frontend_config.proto
+	proto/tls.proto
+
+It has these top-level messages:
+	BackendConfig
+	AuthCookie
+	EncryptedMessage
+	FrontendConfig
+	TCPProxyRoute
+	OauthConfig
+	TLSConfig
+*/
 package proto
 
 import proto1 "github.com/golang/protobuf/proto"
@@ -13,6 +31,10 @@ var _ = proto1.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto1.ProtoPackageIsVersion1
+
 type BackendConfig struct {
 	Server    *BackendConfig_Server `protobuf:"bytes,1,opt,name=server" json:"server,omitempty"`
 	ServePath string                `protobuf:"bytes,2,opt,name=serve_path" json:"serve_path,omitempty"`
@@ -21,7 +43,7 @@ type BackendConfig struct {
 func (m *BackendConfig) Reset()                    { *m = BackendConfig{} }
 func (m *BackendConfig) String() string            { return proto1.CompactTextString(m) }
 func (*BackendConfig) ProtoMessage()               {}
-func (*BackendConfig) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (*BackendConfig) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 func (m *BackendConfig) GetServer() *BackendConfig_Server {
 	if m != nil {
@@ -41,7 +63,7 @@ type BackendConfig_Server struct {
 func (m *BackendConfig_Server) Reset()                    { *m = BackendConfig_Server{} }
 func (m *BackendConfig_Server) String() string            { return proto1.CompactTextString(m) }
 func (*BackendConfig_Server) ProtoMessage()               {}
-func (*BackendConfig_Server) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0, 0} }
+func (*BackendConfig_Server) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0} }
 
 type isBackendConfig_Server_Security interface {
 	isBackendConfig_Server_Security()
@@ -156,7 +178,7 @@ func init() {
 	proto1.RegisterType((*BackendConfig_Server)(nil), "fproxy.BackendConfig.Server")
 }
 
-var fileDescriptor1 = []byte{
+var fileDescriptor0 = []byte{
 	// 212 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x92, 0x2a, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x4f, 0x4a, 0x4c, 0xce, 0x4e, 0xcd, 0x4b, 0x89, 0x4f, 0xce, 0xcf, 0x4b, 0xcb, 0x4c,

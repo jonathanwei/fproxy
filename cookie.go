@@ -15,7 +15,8 @@ import (
 )
 
 type cookieCrypter struct {
-	aead cipher.AEAD
+	aead     cipher.AEAD
+	insecure bool
 }
 
 var (
@@ -32,7 +33,7 @@ func (c cookieCrypter) SetAuthCookie(rw http.ResponseWriter, a *pb.AuthCookie) {
 
 		Expires: time.Now().Add(365 * 24 * time.Hour),
 
-		Secure:   true, // TODO: get this from config.
+		Secure:   !c.insecure,
 		HttpOnly: true,
 	}
 	http.SetCookie(rw, &cookie)

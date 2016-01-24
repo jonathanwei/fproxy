@@ -2,29 +2,40 @@ syntax = "proto3";
 
 package fproxy;
 
+import "proto/tls.proto";
+
 option go_package = "proto";
 
 message FrontendConfig {
   repeated TCPProxyRoute tcp_proxy_route = 1;
 
+  // TODO: this is repeated 3 different times between frontend and backend
+  // config. Consolidate them.
+  message Server {
+    string addr = 1;
+    oneof security {
+      TLSConfig tls = 2;
+      bool insecure = 3;
+    }
+  }
+  Server server = 2;
+
   // TODO: make this repeated.
   message Backend {
     string addr = 1;
-    string root_ca_file = 2;
-    string client_cert_file = 3;
-    string client_key_file = 4;
-    string server_name = 5;
+    oneof security {
+      TLSConfig tls = 2;
+      bool insecure = 3;
+    }
   }
-  Backend backend = 2;
+  Backend backend = 3;
 
-  // TODO: group these into a nested message.
-  string http_addr = 3;
-  string http_cert_file = 4;
-  string http_key_file = 5;
+  OauthConfig oauth_config = 4;
 
-  OauthConfig oauth_config = 6;
-  bytes auth_cookie_key = 7;
-  map<string, string> email_to_user_id = 8;
+  bytes auth_cookie_key = 5;
+  bool auth_cookie_insecure = 6;
+
+  map<string, string> email_to_user_id = 7;
 }
 
 message TCPProxyRoute {

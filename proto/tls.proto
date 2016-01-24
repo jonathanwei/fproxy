@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package fproxy;
+
+message TLSConfig {
+  message Cert {
+    string cert_file = 1;
+    string key_file = 2;
+  }
+
+  message CA {
+    string ca_file = 1;
+  }
+
+  // For servers, the hostname they are serving; this should match a value in
+  // the certificates they are presenting. For clients, the hostname they are
+  // connecting to.
+  string server_name = 1;
+  
+  // Certificates to present to other side.
+  repeated Cert cert = 2;
+
+  // Root CAs to validate cerificates presented by the other side.
+  repeated CA ca = 3;
+}
+

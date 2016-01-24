@@ -11,6 +11,7 @@ It is generated from these files:
 	proto/cookie.proto
 	proto/filesystem.proto
 	proto/frontend_config.proto
+	proto/tls.proto
 
 It has these top-level messages:
 	OpenRequest
@@ -22,6 +23,7 @@ It has these top-level messages:
 	FrontendConfig
 	TCPProxyRoute
 	OauthConfig
+	TLSConfig
 */
 package proto
 

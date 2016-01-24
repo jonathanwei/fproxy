@@ -1,14 +1,8 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"io/ioutil"
 	"strings"
 	"sync"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
@@ -24,6 +18,8 @@ var feCommand = cli.Command{
 The default path for the config proto is "~/.config/fproxy/frontend.textproto".
 
 Supported fields in the config are listed below.
+
+TODO: rewrite.
 
 tcp_proxy_route: this repeated field lets you configure the frontend to perform
 TCP proxying. Each clause must set a single listening address and set a target
@@ -92,44 +88,11 @@ func runFe(configPath string) {
 		runTCPProxy(config.TcpProxyRoute)
 	}()
 
-	conn, err := grpc.Dial(config.Backend.Addr, grpc.WithTransportCredentials(getFeTLS(&config)))
-	if err != nil {
-		glog.Warningf("Couldn't connect to backend: %v", err)
-	}
-	defer conn.Close()
-
-	backendClient := pb.NewBackendClient(conn)
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runHttpServer(&config, backendClient)
+		runHttpServer(&config)
 	}()
 
 	wg.Wait()
-}
-
-func getFeTLS(config *pb.FrontendConfig) credentials.TransportAuthenticator {
-	backend := config.Backend
-	cert, err := tls.LoadX509KeyPair(backend.ClientCertFile, backend.ClientKeyFile)
-	if err != nil {
-		glog.Fatalf("Couldn't load frontend certificate and key: %v", err)
-	}
-
-	rootCAPemBytes, err := ioutil.ReadFile(backend.RootCaFile)
-	if err != nil {
-		glog.Fatalf("Couldn't read backend CA certificate: %v", err)
-	}
-	rootCAs := x509.NewCertPool()
-	ok := rootCAs.AppendCertsFromPEM(rootCAPemBytes)
-	if !ok {
-		glog.Fatal("Unable to append backend CA certificate to root CA pool.")
-	}
-
-	return credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      rootCAs,
-		ServerName:   backend.ServerName,
-		MinVersion:   tls.VersionTLS12,
-	})
 }

@@ -2,14 +2,17 @@ syntax = "proto3";
 
 package fproxy;
 
+import "proto/tls.proto";
+
 option go_package = "proto";
 
 message BackendConfig {
   message Server {
     string addr = 1;
-    string cert_file = 2;
-    string key_file = 3;
-    string client_ca_file = 4;
+    oneof security {
+      TLSConfig tls = 2;
+      bool insecure = 3;
+    }
   }
   Server server = 1;
 

@@ -17,7 +17,7 @@ It has these top-level messages:
 	OpenResponse
 	BackendConfig
 	AuthCookie
-	EncodedAuthCookie
+	EncryptedMessage
 	FileInfo
 	FrontendConfig
 	TCPProxyRoute

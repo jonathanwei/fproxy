@@ -16,8 +16,9 @@ import (
 )
 
 func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
-
-	crypter := newCookieCrypter(config.AuthCookieKey)
+	crypter := cookieCrypter{
+		aead: MustNewAEAD(config.AuthCookieKey),
+	}
 
 	var oauthCfg = &oauth2.Config{
 		ClientID:     config.OauthConfig.ClientId,

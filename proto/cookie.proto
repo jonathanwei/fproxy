@@ -8,7 +8,7 @@ message AuthCookie {
   string user = 1;
 }
 
-message EncodedAuthCookie {
+message EncryptedMessage {
   bytes nonce = 1;
   bytes ciphertext = 2;
 }

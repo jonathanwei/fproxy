@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http"
 	"strings"
@@ -66,7 +67,7 @@ func runBe(configPath string) {
 	}
 
 	if t := srvConfig.GetTls(); t != nil {
-		server.TLSConfig = BackendTLSConfigOrDie(t)
+		l = tls.NewListener(l, BackendTLSConfigOrDie(t))
 	} else if srvConfig.GetInsecure() {
 		PrintServerInsecureWarning()
 	} else {

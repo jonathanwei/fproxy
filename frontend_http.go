@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -33,7 +34,7 @@ func runHttpServer(config *pb.FrontendConfig) {
 	}
 
 	if t := srvConfig.GetTls(); t != nil {
-		server.TLSConfig = FrontendTLSConfigOrDie(t)
+		l = tls.NewListener(l, FrontendTLSConfigOrDie(t))
 	} else if srvConfig.GetInsecure() {
 		PrintServerInsecureWarning()
 	} else {
@@ -87,7 +88,7 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	mux.Handle("/", &feHandler{
 		crypter:  crypter,
 		oauthCfg: oauthCfg,
-		backend:  httputil.NewSingleHostReverseProxy(backendURL),
+		backend:  backendProxy,
 	})
 	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,

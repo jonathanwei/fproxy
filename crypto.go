@@ -71,7 +71,9 @@ func DecryptProto(aead cipher.AEAD, msg string, additionalData []byte, dst proto
 		return false
 	}
 
-	plaintext, err := aead.Open(nil, msgProto.Nonce, msgProto.Ciphertext, additionalData)
+	// Decrypt in-place.
+	plaintext := msgProto.Ciphertext
+	plaintext, err = aead.Open(plaintext, msgProto.Nonce, msgProto.Ciphertext, additionalData)
 	if err != nil {
 		glog.V(2).Infof("Failed to decrypt data: %v", err)
 		return false

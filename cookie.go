@@ -1,12 +1,7 @@
 package main
 
 import (
-	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -23,51 +18,17 @@ type cookieCrypter struct {
 	aead cipher.AEAD
 }
 
-func newCookieCrypter(key []byte) cookieCrypter {
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		glog.Fatalf("Cannot init cookie crypter: %v", err)
-	}
-
-	aead, err := cipher.NewGCM(c)
-	if err != nil {
-		glog.Fatalf("Cannot init cookie crypter: %v", err)
-	}
-
-	return cookieCrypter{aead}
-}
-
 var (
 	authAdditionalData = []byte("fproxy/auth")
 	authCookieName     = "fa"
 )
 
 func (c cookieCrypter) SetAuthCookie(rw http.ResponseWriter, a *pb.AuthCookie) {
-	plaintext, err := proto.Marshal(a)
-	if err != nil {
-		panic(fmt.Sprintf("Couldn't marshal proto: %v", a))
-	}
+	cookieVal := EncryptProto(c.aead, a, authAdditionalData)
 
-	nonce := make([]byte, c.aead.NonceSize())
-	_, err = io.ReadFull(rand.Reader, nonce)
-	if err != nil {
-		glog.Warningf("Couldn't read from /dev/urandom: %v", err)
-		panic(err)
-	}
-
-	ciphertext := c.aead.Seal(nil, nonce, plaintext, authAdditionalData)
-	cookieBytes, err := proto.Marshal(&pb.EncodedAuthCookie{
-		Nonce:      nonce,
-		Ciphertext: ciphertext,
-	})
-	if err != nil {
-		panic(fmt.Sprintf("Couldn't marshal proto: %v", err))
-	}
-
-	cookieStr := base64.RawStdEncoding.EncodeToString(cookieBytes)
 	cookie := http.Cookie{
 		Name:  authCookieName,
-		Value: cookieStr,
+		Value: cookieVal,
 
 		Expires: time.Now().Add(365 * 24 * time.Hour),
 
@@ -83,29 +44,10 @@ func (c cookieCrypter) GetAuthCookie(req *http.Request) *pb.AuthCookie {
 		return nil
 	}
 
-	cookieBytes, err := base64.RawStdEncoding.DecodeString(cookie.Value)
-	if err != nil {
-		glog.Warningf("Got auth cookie with invalid base64: %q", cookie.Value)
-		return nil
-	}
-
-	var encodedCookie pb.EncodedAuthCookie
-	err = proto.Unmarshal(cookieBytes, &encodedCookie)
-	if err != nil {
-		glog.Warningf("Got auth cookie with unmarshallable proto: %q", cookieBytes)
-		return nil
-	}
-
-	plaintext, err := c.aead.Open(nil, encodedCookie.Nonce, encodedCookie.Ciphertext, authAdditionalData)
-	if err != nil {
-		glog.Warningf("Got auth cookie with invalid authenticator: %v", err)
-		return nil
-	}
-
 	var authCookie pb.AuthCookie
-	err = proto.Unmarshal(plaintext, &authCookie)
-	if err != nil {
-		glog.Errorf("Couldn't unmarshal auth cookie that was authenticated: %v", err)
+	ok := DecryptProto(c.aead, cookie.Value, authAdditionalData, &authCookie)
+	if !ok {
+		glog.Errorf("Couldn't decrypt auth cookie; pretending it didn't exist.")
 		return nil
 	}
 

@@ -2,7 +2,10 @@ package main
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"time"
 
 	"golang.org/x/net/context"
@@ -15,9 +18,36 @@ import (
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
-func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
+func runHttpServer(config *pb.FrontendConfig) {
+	srvConfig := config.GetServer()
+
+	l, err := net.Listen("tcp", srvConfig.Addr)
+	if err != nil {
+		glog.Fatalf("Failed to listen on %v: %v", srvConfig.Addr, err)
+	}
+	defer l.Close()
+
+	glog.Infof("Listening for requests on %v", l.Addr())
+
+	server := &http.Server{
+		Handler: getFrontendHTTPMux(config),
+	}
+
+	if t := srvConfig.GetTls(); t != nil {
+		l = tls.NewListener(l, FrontendTLSConfigOrDie(t))
+	} else if srvConfig.GetInsecure() {
+		PrintServerInsecureWarning()
+	} else {
+		glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
+	}
+
+	glog.Fatal(server.Serve(l))
+}
+
+func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	crypter := cookieCrypter{
-		aead: MustNewAEAD(config.AuthCookieKey),
+		aead:     NewAEADOrDie(config.AuthCookieKey),
+		insecure: config.AuthCookieInsecure,
 	}
 
 	var oauthCfg = &oauth2.Config{
@@ -31,11 +61,33 @@ func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
 		Scopes: []string{"email"},
 	}
 
+	backendURL, err := url.Parse(config.GetBackend().Addr)
+	if err != nil {
+		glog.Fatalf("Backend url is invalid: %v", err)
+	}
+
+	backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
+
+	if t := config.GetBackend().GetTls(); t != nil {
+		backendProxy.Transport = &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			TLSClientConfig:     FrontendClientTLSConfigOrDie(t),
+			TLSHandshakeTimeout: 10 * time.Second,
+		}
+	} else if config.GetBackend().GetInsecure() {
+		PrintClientInsecureWarning()
+	} else {
+		glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/", &feHandler{
 		crypter:  crypter,
-		client:   client,
 		oauthCfg: oauthCfg,
+		backend:  backendProxy,
 	})
 	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,
@@ -46,41 +98,18 @@ func runHttpServer(config *pb.FrontendConfig, client pb.BackendClient) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
 
-	server := &http.Server{
-		Addr:    config.HttpAddr,
-		Handler: mux,
-		TLSConfig: &tls.Config{
-			MinVersion: tls.VersionTLS12,
-		},
-	}
-
-	glog.Fatal(server.ListenAndServeTLS(config.HttpCertFile, config.HttpKeyFile))
+	return mux
 }
 
 type feHandler struct {
 	crypter  cookieCrypter
-	client   pb.BackendClient
 	oauthCfg *oauth2.Config
+
+	// TODO: make this a list of backends.
+	backend http.Handler
 }
 
 func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	ctx := context.Background()
-
-	// Enable end-to-end cancellation.
-	if c, ok := rw.(http.CloseNotifier); ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-		ch := c.CloseNotify()
-
-		go func() {
-			select {
-			case <-ctx.Done():
-			case <-ch:
-				cancel()
-			}
-		}()
-	}
-
 	cookie := f.crypter.GetAuthCookie(req)
 	if cookie == nil {
 		// TODO: Sign state.
@@ -89,9 +118,9 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		http.Redirect(rw, req, url, http.StatusFound)
 		return
 	}
-	ctx = WithAuthCookie(ctx, cookie)
 
-	http.FileServer(grpcFs{ctx, f.client}).ServeHTTP(rw, req)
+	req.Header.Add("User", cookie.User)
+	f.backend.ServeHTTP(rw, req)
 }
 
 type oauthHandler struct {

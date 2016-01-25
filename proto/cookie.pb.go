@@ -20,7 +20,7 @@ type AuthCookie struct {
 func (m *AuthCookie) Reset()                    { *m = AuthCookie{} }
 func (m *AuthCookie) String() string            { return proto1.CompactTextString(m) }
 func (*AuthCookie) ProtoMessage()               {}
-func (*AuthCookie) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*AuthCookie) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
 
 type EncryptedMessage struct {
 	Nonce      []byte `protobuf:"bytes,1,opt,name=nonce,proto3" json:"nonce,omitempty"`
@@ -30,14 +30,14 @@ type EncryptedMessage struct {
 func (m *EncryptedMessage) Reset()                    { *m = EncryptedMessage{} }
 func (m *EncryptedMessage) String() string            { return proto1.CompactTextString(m) }
 func (*EncryptedMessage) ProtoMessage()               {}
-func (*EncryptedMessage) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (*EncryptedMessage) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{1} }
 
 func init() {
 	proto1.RegisterType((*AuthCookie)(nil), "fproxy.AuthCookie")
 	proto1.RegisterType((*EncryptedMessage)(nil), "fproxy.EncryptedMessage")
 }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor1 = []byte{
 	// 140 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x12, 0x2a, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x4f, 0xce, 0xcf, 0xcf, 0xce, 0x4c, 0xd5, 0x03, 0x73, 0x84, 0xd8, 0xd2, 0x80, 0x74,

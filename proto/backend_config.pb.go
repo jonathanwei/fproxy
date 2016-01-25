@@ -2,6 +2,24 @@
 // source: proto/backend_config.proto
 // DO NOT EDIT!
 
+/*
+Package proto is a generated protocol buffer package.
+
+It is generated from these files:
+	proto/backend_config.proto
+	proto/cookie.proto
+	proto/frontend_config.proto
+	proto/tls.proto
+
+It has these top-level messages:
+	BackendConfig
+	AuthCookie
+	EncryptedMessage
+	FrontendConfig
+	TCPProxyRoute
+	OauthConfig
+	TLSConfig
+*/
 package proto
 
 import proto1 "github.com/golang/protobuf/proto"
@@ -13,6 +31,10 @@ var _ = proto1.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the proto package it is being compiled against.
+const _ = proto1.ProtoPackageIsVersion1
+
 type BackendConfig struct {
 	Server    *BackendConfig_Server `protobuf:"bytes,1,opt,name=server" json:"server,omitempty"`
 	ServePath string                `protobuf:"bytes,2,opt,name=serve_path" json:"serve_path,omitempty"`
@@ -21,7 +43,7 @@ type BackendConfig struct {
 func (m *BackendConfig) Reset()                    { *m = BackendConfig{} }
 func (m *BackendConfig) String() string            { return proto1.CompactTextString(m) }
 func (*BackendConfig) ProtoMessage()               {}
-func (*BackendConfig) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (*BackendConfig) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
 
 func (m *BackendConfig) GetServer() *BackendConfig_Server {
 	if m != nil {
@@ -31,36 +53,145 @@ func (m *BackendConfig) GetServer() *BackendConfig_Server {
 }
 
 type BackendConfig_Server struct {
-	Addr         string `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`
-	CertFile     string `protobuf:"bytes,2,opt,name=cert_file" json:"cert_file,omitempty"`
-	KeyFile      string `protobuf:"bytes,3,opt,name=key_file" json:"key_file,omitempty"`
-	ClientCaFile string `protobuf:"bytes,4,opt,name=client_ca_file" json:"client_ca_file,omitempty"`
+	Addr string `protobuf:"bytes,1,opt,name=addr" json:"addr,omitempty"`
+	// Types that are valid to be assigned to Security:
+	//	*BackendConfig_Server_Tls
+	//	*BackendConfig_Server_Insecure
+	Security isBackendConfig_Server_Security `protobuf_oneof:"security"`
 }
 
 func (m *BackendConfig_Server) Reset()                    { *m = BackendConfig_Server{} }
 func (m *BackendConfig_Server) String() string            { return proto1.CompactTextString(m) }
 func (*BackendConfig_Server) ProtoMessage()               {}
-func (*BackendConfig_Server) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0, 0} }
+func (*BackendConfig_Server) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0, 0} }
+
+type isBackendConfig_Server_Security interface {
+	isBackendConfig_Server_Security()
+}
+
+type BackendConfig_Server_Tls struct {
+	Tls *TLSConfig `protobuf:"bytes,2,opt,name=tls,oneof"`
+}
+type BackendConfig_Server_Insecure struct {
+	Insecure bool `protobuf:"varint,3,opt,name=insecure,oneof"`
+}
+
+func (*BackendConfig_Server_Tls) isBackendConfig_Server_Security()      {}
+func (*BackendConfig_Server_Insecure) isBackendConfig_Server_Security() {}
+
+func (m *BackendConfig_Server) GetSecurity() isBackendConfig_Server_Security {
+	if m != nil {
+		return m.Security
+	}
+	return nil
+}
+
+func (m *BackendConfig_Server) GetTls() *TLSConfig {
+	if x, ok := m.GetSecurity().(*BackendConfig_Server_Tls); ok {
+		return x.Tls
+	}
+	return nil
+}
+
+func (m *BackendConfig_Server) GetInsecure() bool {
+	if x, ok := m.GetSecurity().(*BackendConfig_Server_Insecure); ok {
+		return x.Insecure
+	}
+	return false
+}
+
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*BackendConfig_Server) XXX_OneofFuncs() (func(msg proto1.Message, b *proto1.Buffer) error, func(msg proto1.Message, tag, wire int, b *proto1.Buffer) (bool, error), func(msg proto1.Message) (n int), []interface{}) {
+	return _BackendConfig_Server_OneofMarshaler, _BackendConfig_Server_OneofUnmarshaler, _BackendConfig_Server_OneofSizer, []interface{}{
+		(*BackendConfig_Server_Tls)(nil),
+		(*BackendConfig_Server_Insecure)(nil),
+	}
+}
+
+func _BackendConfig_Server_OneofMarshaler(msg proto1.Message, b *proto1.Buffer) error {
+	m := msg.(*BackendConfig_Server)
+	// security
+	switch x := m.Security.(type) {
+	case *BackendConfig_Server_Tls:
+		b.EncodeVarint(2<<3 | proto1.WireBytes)
+		if err := b.EncodeMessage(x.Tls); err != nil {
+			return err
+		}
+	case *BackendConfig_Server_Insecure:
+		t := uint64(0)
+		if x.Insecure {
+			t = 1
+		}
+		b.EncodeVarint(3<<3 | proto1.WireVarint)
+		b.EncodeVarint(t)
+	case nil:
+	default:
+		return fmt.Errorf("BackendConfig_Server.Security has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _BackendConfig_Server_OneofUnmarshaler(msg proto1.Message, tag, wire int, b *proto1.Buffer) (bool, error) {
+	m := msg.(*BackendConfig_Server)
+	switch tag {
+	case 2: // security.tls
+		if wire != proto1.WireBytes {
+			return true, proto1.ErrInternalBadWireType
+		}
+		msg := new(TLSConfig)
+		err := b.DecodeMessage(msg)
+		m.Security = &BackendConfig_Server_Tls{msg}
+		return true, err
+	case 3: // security.insecure
+		if wire != proto1.WireVarint {
+			return true, proto1.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Security = &BackendConfig_Server_Insecure{x != 0}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _BackendConfig_Server_OneofSizer(msg proto1.Message) (n int) {
+	m := msg.(*BackendConfig_Server)
+	// security
+	switch x := m.Security.(type) {
+	case *BackendConfig_Server_Tls:
+		s := proto1.Size(x.Tls)
+		n += proto1.SizeVarint(2<<3 | proto1.WireBytes)
+		n += proto1.SizeVarint(uint64(s))
+		n += s
+	case *BackendConfig_Server_Insecure:
+		n += proto1.SizeVarint(3<<3 | proto1.WireVarint)
+		n += 1
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
 
 func init() {
 	proto1.RegisterType((*BackendConfig)(nil), "fproxy.BackendConfig")
 	proto1.RegisterType((*BackendConfig_Server)(nil), "fproxy.BackendConfig.Server")
 }
 
-var fileDescriptor1 = []byte{
-	// 211 bytes of a gzipped FileDescriptorProto
+var fileDescriptor0 = []byte{
+	// 212 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x92, 0x2a, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x4f, 0x4a, 0x4c, 0xce, 0x4e, 0xcd, 0x4b, 0x89, 0x4f, 0xce, 0xcf, 0x4b, 0xcb, 0x4c,
-	0xd7, 0x03, 0x0b, 0x0a, 0xb1, 0xa5, 0x01, 0xe9, 0x8a, 0x4a, 0xa5, 0x07, 0x8c, 0x5c, 0xbc, 0x4e,
-	0x10, 0x05, 0xce, 0x60, 0x79, 0x21, 0x13, 0x2e, 0xb6, 0xe2, 0xd4, 0xa2, 0xb2, 0xd4, 0x22, 0x09,
-	0x46, 0x05, 0x46, 0x0d, 0x6e, 0x23, 0x19, 0x3d, 0x88, 0x52, 0x3d, 0x14, 0x65, 0x7a, 0xc1, 0x60,
-	0x35, 0x41, 0x50, 0xb5, 0x42, 0xb2, 0x5c, 0x5c, 0x60, 0x56, 0x7c, 0x41, 0x62, 0x49, 0x86, 0x04,
-	0x13, 0x50, 0x27, 0x67, 0x10, 0x27, 0x58, 0x24, 0x00, 0x28, 0x20, 0x55, 0xc5, 0xc5, 0x06, 0xd1,
-	0x20, 0x24, 0xc4, 0xc5, 0x92, 0x98, 0x92, 0x02, 0x31, 0x9c, 0x33, 0x08, 0xcc, 0x16, 0x92, 0xe6,
-	0xe2, 0x4c, 0x4e, 0x2d, 0x2a, 0x89, 0x4f, 0xcb, 0xcc, 0x49, 0x85, 0xea, 0xe5, 0x00, 0x09, 0xb8,
-	0x01, 0xf9, 0x42, 0x92, 0x5c, 0x1c, 0xd9, 0xa9, 0x95, 0x10, 0x39, 0x66, 0xb0, 0x1c, 0x3b, 0x90,
-	0x0f, 0x96, 0x52, 0xe1, 0xe2, 0x4b, 0xce, 0xc9, 0x4c, 0xcd, 0x2b, 0x89, 0x4f, 0x4e, 0x84, 0x28,
-	0x60, 0x01, 0x2b, 0xe0, 0x81, 0x88, 0x3a, 0x27, 0x82, 0x54, 0x39, 0xb1, 0x47, 0xb1, 0x82, 0xfd,
-	0x9c, 0xc4, 0x06, 0xa6, 0x8c, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xad, 0xa5, 0xc8, 0xfb, 0x18,
-	0x01, 0x00, 0x00,
+	0xd7, 0x03, 0x0b, 0x0a, 0xb1, 0xa5, 0x01, 0xe9, 0x8a, 0x4a, 0x29, 0x7e, 0x88, 0x9a, 0x92, 0x9c,
+	0x62, 0x88, 0x84, 0xd2, 0x65, 0x46, 0x2e, 0x5e, 0x27, 0x88, 0x0e, 0x67, 0xb0, 0x06, 0x21, 0x13,
+	0x2e, 0xb6, 0xe2, 0xd4, 0xa2, 0xb2, 0xd4, 0x22, 0x09, 0x46, 0x05, 0x46, 0x0d, 0x6e, 0x23, 0x19,
+	0x3d, 0x88, 0x5e, 0x3d, 0x14, 0x65, 0x7a, 0xc1, 0x60, 0x35, 0x41, 0x50, 0xb5, 0x42, 0xb2, 0x5c,
+	0x5c, 0x60, 0x56, 0x7c, 0x41, 0x62, 0x49, 0x86, 0x04, 0x13, 0x50, 0x27, 0x67, 0x10, 0x27, 0x58,
+	0x24, 0x00, 0x28, 0x20, 0x95, 0xcb, 0xc5, 0x06, 0xd1, 0x20, 0x24, 0xc4, 0xc5, 0x92, 0x98, 0x92,
+	0x02, 0x31, 0x9c, 0x33, 0x08, 0xcc, 0x16, 0x52, 0xe5, 0x62, 0x06, 0xba, 0x08, 0xac, 0x8b, 0xdb,
+	0x48, 0x10, 0x66, 0x5f, 0x88, 0x4f, 0x30, 0xc4, 0x2e, 0x0f, 0x86, 0x20, 0x90, 0xbc, 0x90, 0x0c,
+	0x17, 0x47, 0x66, 0x5e, 0x71, 0x6a, 0x72, 0x69, 0x51, 0xaa, 0x04, 0x33, 0x50, 0x2d, 0x07, 0x50,
+	0x02, 0x2e, 0xe2, 0xc4, 0xc5, 0xc5, 0x01, 0x66, 0x65, 0x96, 0x54, 0x3a, 0xb1, 0x47, 0xb1, 0x82,
+	0xbd, 0x97, 0xc4, 0x06, 0xa6, 0x8c, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0xbc, 0xd0, 0xef, 0x28,
+	0x1c, 0x01, 0x00, 0x00,
 }

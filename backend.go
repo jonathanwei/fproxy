@@ -81,10 +81,7 @@ func getBackendHTTPMux(config *pb.BackendConfig) http.Handler {
 	mux := http.NewServeMux()
 
 	fs := http.FileServer(http.Dir(config.ServePath))
-	mux.HandleFunc("/", func(rw http.ResponseWriter, req *http.Request) {
-		glog.Infof("Got request from user: %v", req.Header.Get("User"))
-		fs.ServeHTTP(rw, req)
-	})
+	mux.Handle("/", fs)
 
 	return mux
 }

@@ -68,7 +68,6 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 
 	backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
 
-	// TODO: configure client certs on outbound connection to backend.
 	if t := config.GetBackend().GetTls(); t != nil {
 		backendProxy.Transport = &http.Transport{
 			Dial: (&net.Dialer{

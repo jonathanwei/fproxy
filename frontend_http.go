@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/cipher"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -52,6 +53,8 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		insecure: config.AuthCookieInsecure,
 	}
 
+	oauthAEAD := NewAEADOrDie(config.GetOauthConfig().StateKey)
+
 	var oauthCfg = &oauth2.Config{
 		ClientID:     config.OauthConfig.ClientId,
 		ClientSecret: config.OauthConfig.ClientSecret,
@@ -101,8 +104,9 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", &feHandler{
-		crypter:  crypter,
-		oauthCfg: oauthCfg,
+		crypter:   crypter,
+		oauthCfg:  oauthCfg,
+		oauthAEAD: oauthAEAD,
 
 		backendPaths: backendPaths,
 		backendMux:   backendMux,
@@ -110,6 +114,7 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,
 		cfg:           oauthCfg,
+		aead:          oauthAEAD,
 		emailToUserId: config.EmailToUserId,
 	})
 	mux.HandleFunc("/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
@@ -120,8 +125,9 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 }
 
 type feHandler struct {
-	crypter  cookieCrypter
-	oauthCfg *oauth2.Config
+	crypter   cookieCrypter
+	oauthCfg  *oauth2.Config
+	oauthAEAD cipher.AEAD
 
 	backendPaths []string
 	backendMux   http.Handler
@@ -131,7 +137,7 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	cookie := f.crypter.GetAuthCookie(req)
 	if cookie == nil {
 		// TODO: Sign state.
-		state := req.URL.Path
+		state := EncryptProto(f.oauthAEAD, &pb.OAuthState{Path: req.URL.Path}, nil)
 		url := f.oauthCfg.AuthCodeURL(state)
 		http.Redirect(rw, req, url, http.StatusFound)
 		return
@@ -163,6 +169,7 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 type oauthHandler struct {
 	crypter       cookieCrypter
 	cfg           *oauth2.Config
+	aead          cipher.AEAD
 	emailToUserId map[string]string
 }
 
@@ -198,8 +205,12 @@ func (o oauthHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	if uid, ok := o.emailToUserId[tokInfo.Email]; ok && tokInfo.VerifiedEmail {
 		o.crypter.SetAuthCookie(rw, &pb.AuthCookie{User: uid})
-		// TODO: verify 'state' signature.
-		http.Redirect(rw, req, req.FormValue("state"), http.StatusFound)
+		var state pb.OAuthState
+		redirectPath := "/"
+		if DecryptProto(o.aead, req.FormValue("state"), nil, &state) {
+			redirectPath = state.Path
+		}
+		http.Redirect(rw, req, redirectPath, http.StatusFound)
 		return
 	}
 

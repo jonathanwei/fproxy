@@ -4,6 +4,6 @@ package fproxy;
 
 option go_package = "proto";
 
-message AuthCookie {
-  string user = 1;
+message OAuthState {
+  string path = 1;
 }

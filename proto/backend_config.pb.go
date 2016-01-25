@@ -8,7 +8,9 @@ Package proto is a generated protocol buffer package.
 It is generated from these files:
 	proto/backend_config.proto
 	proto/cookie.proto
+	proto/crypto.proto
 	proto/frontend_config.proto
+	proto/oauth.proto
 	proto/tls.proto
 
 It has these top-level messages:
@@ -18,6 +20,7 @@ It has these top-level messages:
 	FrontendConfig
 	TCPProxyRoute
 	OauthConfig
+	OAuthState
 	TLSConfig
 */
 package proto

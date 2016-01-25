@@ -27,7 +27,7 @@ type TLSConfig struct {
 func (m *TLSConfig) Reset()                    { *m = TLSConfig{} }
 func (m *TLSConfig) String() string            { return proto1.CompactTextString(m) }
 func (*TLSConfig) ProtoMessage()               {}
-func (*TLSConfig) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (*TLSConfig) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
 
 func (m *TLSConfig) GetCert() []*TLSConfig_Cert {
 	if m != nil {
@@ -51,7 +51,7 @@ type TLSConfig_Cert struct {
 func (m *TLSConfig_Cert) Reset()                    { *m = TLSConfig_Cert{} }
 func (m *TLSConfig_Cert) String() string            { return proto1.CompactTextString(m) }
 func (*TLSConfig_Cert) ProtoMessage()               {}
-func (*TLSConfig_Cert) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0, 0} }
+func (*TLSConfig_Cert) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0, 0} }
 
 type TLSConfig_CA struct {
 	CaFile string `protobuf:"bytes,1,opt,name=ca_file" json:"ca_file,omitempty"`
@@ -60,7 +60,7 @@ type TLSConfig_CA struct {
 func (m *TLSConfig_CA) Reset()                    { *m = TLSConfig_CA{} }
 func (m *TLSConfig_CA) String() string            { return proto1.CompactTextString(m) }
 func (*TLSConfig_CA) ProtoMessage()               {}
-func (*TLSConfig_CA) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0, 1} }
+func (*TLSConfig_CA) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0, 1} }
 
 func init() {
 	proto1.RegisterType((*TLSConfig)(nil), "fproxy.TLSConfig")
@@ -68,7 +68,7 @@ func init() {
 	proto1.RegisterType((*TLSConfig_CA)(nil), "fproxy.TLSConfig.CA")
 }
 
-var fileDescriptor3 = []byte{
+var fileDescriptor5 = []byte{
 	// 197 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0xe2, 0x2f, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0x2f, 0xc9, 0x29, 0xd6, 0x03, 0xb3, 0x84, 0xd8, 0xd2, 0x80, 0x74, 0x45, 0xa5, 0xd2,

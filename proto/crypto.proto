@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package fproxy;
+
+option go_package = "proto";
+
+message EncryptedMessage {
+  bytes nonce = 1;
+  bytes ciphertext = 2;
+}

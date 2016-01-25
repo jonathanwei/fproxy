@@ -23,4 +23,3 @@ message TLSConfig {
   // Root CAs to validate cerificates presented by the other side.
   repeated CA ca = 3;
 }
-

@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -61,33 +63,49 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		Scopes: []string{"email"},
 	}
 
-	backendURL, err := url.Parse(config.GetBackend().Addr)
-	if err != nil {
-		glog.Fatalf("Backend url is invalid: %v", err)
-	}
-
-	backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
-
-	if t := config.GetBackend().GetTls(); t != nil {
-		backendProxy.Transport = &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			TLSClientConfig:     FrontendClientTLSConfigOrDie(t),
-			TLSHandshakeTimeout: 10 * time.Second,
+	backendMux := http.NewServeMux()
+	var backendPaths []string
+	for _, backendCfg := range config.Backend {
+		if strings.Contains(backendCfg.Path, "/") {
+			glog.Fatalf("Backend path must not contain slashes: %v", backendCfg.Path)
+		} else if backendCfg.Path == "" {
+			glog.Fatal("Backend path must be non-empty.")
 		}
-	} else if config.GetBackend().GetInsecure() {
-		PrintClientInsecureWarning()
-	} else {
-		glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
+
+		backendURL, err := url.Parse(backendCfg.Addr)
+		if err != nil {
+			glog.Fatalf("Backend url is invalid: %v", err)
+		}
+
+		backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
+
+		if t := backendCfg.GetTls(); t != nil {
+			backendProxy.Transport = &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSClientConfig:     FrontendClientTLSConfigOrDie(t),
+				TLSHandshakeTimeout: 10 * time.Second,
+			}
+		} else if backendCfg.GetInsecure() {
+			PrintClientInsecureWarning()
+		} else {
+			glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
+		}
+
+		backendPath := "/" + backendCfg.Path + "/"
+		backendMux.Handle(backendPath, http.StripPrefix(backendPath, backendProxy))
+		backendPaths = append(backendPaths, backendPath)
 	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/", &feHandler{
 		crypter:  crypter,
 		oauthCfg: oauthCfg,
-		backend:  backendProxy,
+
+		backendPaths: backendPaths,
+		backendMux:   backendMux,
 	})
 	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,
@@ -105,8 +123,8 @@ type feHandler struct {
 	crypter  cookieCrypter
 	oauthCfg *oauth2.Config
 
-	// TODO: make this a list of backends.
-	backend http.Handler
+	backendPaths []string
+	backendMux   http.Handler
 }
 
 func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -120,7 +138,26 @@ func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	req.Header.Add("User", cookie.User)
-	f.backend.ServeHTTP(rw, req)
+	req.Header.Del("Cookie")
+	reqPath := req.URL.Path
+	for _, backendPath := range f.backendPaths {
+		if strings.HasPrefix(reqPath, backendPath) ||
+			reqPath == backendPath[:len(backendPath)-1] {
+			f.backendMux.ServeHTTP(rw, req)
+			return
+		}
+	}
+
+	if reqPath != "/" {
+		http.NotFound(rw, req)
+		return
+	}
+	rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(rw, "<pre>\n")
+	for _, path := range f.backendPaths {
+		fmt.Fprintf(rw, "<a href=\"%s\">%s</a>\n", path[1:], path[1:])
+	}
+	fmt.Fprintf(rw, "</pre>\n")
 }
 
 type oauthHandler struct {

@@ -20,15 +20,15 @@ message FrontendConfig {
   }
   Server server = 2;
 
-  // TODO: make this repeated.
   message Backend {
     string addr = 1;
+    string path = 2;
     oneof security {
-      TLSConfig tls = 2;
-      bool insecure = 3;
+      TLSConfig tls = 3;
+      bool insecure = 4;
     }
   }
-  Backend backend = 3;
+  repeated Backend backend = 3;
 
   OauthConfig oauth_config = 4;
 

@@ -102,15 +102,20 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		backendPaths = append(backendPaths, backendPath)
 	}
 
-	mux := http.NewServeMux()
-	mux.Handle("/", &feHandler{
-		crypter:   crypter,
-		oauthCfg:  oauthCfg,
-		oauthAEAD: oauthAEAD,
+	authedHandler := func(next http.Handler) http.Handler {
+		return &authHandler{
+			crypter:   crypter,
+			oauthCfg:  oauthCfg,
+			oauthAEAD: oauthAEAD,
+			next:      next,
+		}
+	}
 
+	mux := http.NewServeMux()
+	mux.Handle("/", authedHandler(&feHandler{
 		backendPaths: backendPaths,
 		backendMux:   backendMux,
-	})
+	}))
 	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,
 		cfg:           oauthCfg,
@@ -124,27 +129,33 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	return mux
 }
 
-type feHandler struct {
+type authHandler struct {
 	crypter   cookieCrypter
 	oauthCfg  *oauth2.Config
 	oauthAEAD cipher.AEAD
-
-	backendPaths []string
-	backendMux   http.Handler
+	next      http.Handler
 }
 
-func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	cookie := f.crypter.GetAuthCookie(req)
+func (a *authHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	cookie := a.crypter.GetAuthCookie(req)
 	if cookie == nil {
-		// TODO: Sign state.
-		state := EncryptProto(f.oauthAEAD, &pb.OAuthState{Path: req.URL.Path}, nil)
-		url := f.oauthCfg.AuthCodeURL(state)
+		state := EncryptProto(a.oauthAEAD, &pb.OAuthState{Path: req.URL.Path}, nil)
+		url := a.oauthCfg.AuthCodeURL(state)
 		http.Redirect(rw, req, url, http.StatusFound)
 		return
 	}
 
 	req.Header.Add("User", cookie.User)
 	req.Header.Del("Cookie")
+	a.next.ServeHTTP(rw, req)
+}
+
+type feHandler struct {
+	backendPaths []string
+	backendMux   http.Handler
+}
+
+func (f *feHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	reqPath := req.URL.Path
 	for _, backendPath := range f.backendPaths {
 		if strings.HasPrefix(reqPath, backendPath) ||

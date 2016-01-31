@@ -19,6 +19,7 @@ import (
 
 	"github.com/golang/glog"
 	pb "github.com/jonathanwei/fproxy/proto"
+	"github.com/unrolled/secure"
 )
 
 func runHttpServer(config *pb.FrontendConfig) {
@@ -126,7 +127,17 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
 
-	return mux
+	secureMiddleware := secure.New(secure.Options{
+		STSSeconds:            60 * 60 * 24 * 365, // One year.
+		STSIncludeSubdomains:  true,
+		STSPreload:            true,
+		FrameDeny:             true,
+		ContentTypeNosniff:    true,
+		BrowserXssFilter:      true,
+		ContentSecurityPolicy: "default-src 'self'",
+		IsDevelopment:         config.GetServer().GetInsecure(),
+	})
+	return secureMiddleware.Handler(mux)
 }
 
 type authHandler struct {

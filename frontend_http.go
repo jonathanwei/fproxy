@@ -49,6 +49,11 @@ func runHttpServer(config *pb.FrontendConfig) {
 }
 
 func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
+	hostname := config.GetServer().Hostname
+	if hostname == "" {
+		glog.Fatal("Must provide a hostname for the frontend.")
+	}
+
 	crypter := cookieCrypter{
 		aead:     NewAEADOrDie(config.AuthCookieKey),
 		insecure: config.AuthCookieInsecure,
@@ -113,17 +118,17 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/", authedHandler(&feHandler{
+	mux.Handle(hostname+"/", authedHandler(&feHandler{
 		backendPaths: backendPaths,
 		backendMux:   backendMux,
 	}))
-	mux.Handle("/oauth2Callback", oauthHandler{
+	mux.Handle(hostname+"/oauth2Callback", oauthHandler{
 		crypter:       crypter,
 		cfg:           oauthCfg,
 		aead:          oauthAEAD,
 		emailToUserId: config.EmailToUserId,
 	})
-	mux.HandleFunc("/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
+	mux.HandleFunc(hostname+"/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
 

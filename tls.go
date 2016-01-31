@@ -32,13 +32,16 @@ func TLSConfig(config *pb.TLSConfig) (*tls.Config, error) {
 		}
 	}
 
-	return &tls.Config{
+	c := &tls.Config{
 		Certificates: certs,
 		RootCAs:      caCertPool,
 		ClientCAs:    caCertPool,
 		ServerName:   config.ServerName,
 		MinVersion:   tls.VersionTLS12,
-	}, nil
+	}
+	c.BuildNameToCertificate()
+
+	return c, nil
 }
 
 func TLSConfigOrDie(config *pb.TLSConfig) *tls.Config {

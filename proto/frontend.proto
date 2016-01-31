@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package fproxy;
+
+option go_package = "proto";
+
+message PortUpdate {
+  int32 port = 1;
+}

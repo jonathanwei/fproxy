@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/cipher"
 	"crypto/tls"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
@@ -62,6 +67,8 @@ func runBe(configPath string) {
 
 	glog.Infof("Listening for requests on %v", l.Addr())
 
+	go updateFrontendPort(NewAEADOrDie(config.PortKey), l.Addr(), config.PortUpdateUrl)
+
 	server := &http.Server{
 		Handler: getBackendHTTPMux(&config),
 	}
@@ -75,6 +82,38 @@ func runBe(configPath string) {
 	}
 
 	glog.Fatal(server.Serve(l))
+}
+
+func updateFrontendPort(aead cipher.AEAD, addr net.Addr, url string) {
+	update := &pb.PortUpdate{
+		Port: int32(addr.(*net.TCPAddr).Port),
+	}
+
+	url = url + "/" + EncryptProto(aead, update, nil)
+	for {
+		glog.Infof("Posting update: %v", update)
+		err := getURL(url)
+		if err != nil {
+			// TODO: Change this to exponential backoff.
+			glog.Warningf("Got error updating port: %v", err)
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
+func getURL(url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("Got non-200 response: %v", resp)
+	}
+
+	_, err = io.Copy(ioutil.Discard, resp.Body)
+	return err
 }
 
 func getBackendHTTPMux(config *pb.BackendConfig) http.Handler {

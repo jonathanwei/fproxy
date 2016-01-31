@@ -20,13 +20,13 @@ type OAuthState struct {
 func (m *OAuthState) Reset()                    { *m = OAuthState{} }
 func (m *OAuthState) String() string            { return proto1.CompactTextString(m) }
 func (*OAuthState) ProtoMessage()               {}
-func (*OAuthState) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (*OAuthState) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
 
 func init() {
 	proto1.RegisterType((*OAuthState)(nil), "fproxy.OAuthState")
 }
 
-var fileDescriptor4 = []byte{
+var fileDescriptor5 = []byte{
 	// 87 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x09, 0x6e, 0x88, 0x02, 0xff, 0xe2, 0x12, 0x2c, 0x28, 0xca, 0x2f,
 	0xc9, 0xd7, 0xcf, 0x4f, 0x2c, 0x2d, 0xc9, 0xd0, 0x03, 0xb3, 0x85, 0xd8, 0xd2, 0x80, 0x74, 0x45,

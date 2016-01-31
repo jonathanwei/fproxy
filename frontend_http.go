@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -73,23 +74,19 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	}
 
 	backendMux := http.NewServeMux()
+	portUpdateMux := http.NewServeMux()
+
 	var backendPaths []string
 	for _, backendCfg := range config.Backend {
-		if strings.Contains(backendCfg.Path, "/") {
-			glog.Fatalf("Backend path must not contain slashes: %v", backendCfg.Path)
-		} else if backendCfg.Path == "" {
-			glog.Fatal("Backend path must be non-empty.")
+		if strings.Contains(backendCfg.Name, "/") {
+			glog.Fatalf("Backend name must not contain slashes: %v", backendCfg.Name)
+		} else if backendCfg.Name == "" {
+			glog.Fatal("Backend name must be non-empty.")
 		}
 
-		backendURL, err := url.Parse(backendCfg.Addr)
-		if err != nil {
-			glog.Fatalf("Backend url is invalid: %v", err)
-		}
-
-		backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
-
+		transport := http.DefaultTransport
 		if t := backendCfg.GetTls(); t != nil {
-			backendProxy.Transport = &http.Transport{
+			transport = &http.Transport{
 				Dial: (&net.Dialer{
 					Timeout:   30 * time.Second,
 					KeepAlive: 30 * time.Second,
@@ -103,9 +100,22 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 			glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
 		}
 
-		backendPath := "/" + backendCfg.Path + "/"
-		backendMux.Handle(backendPath, http.StripPrefix(backendPath, backendProxy))
+		backendProxyHandler := &backendProxyHandler{
+			config:    backendCfg,
+			transport: transport,
+		}
+
+		portHandler := &portHandler{
+			b:    backendProxyHandler,
+			aead: NewAEADOrDie(backendCfg.PortKey),
+		}
+
+		backendPath := "/" + backendCfg.Name + "/"
+		backendMux.Handle(backendPath, http.StripPrefix(backendPath, backendProxyHandler))
 		backendPaths = append(backendPaths, backendPath)
+
+		// TODO: Find out why we can't have two levels of StripPrefix.
+		portUpdateMux.Handle(hostname+"/portupdate"+backendPath, http.StripPrefix("/portupdate"+backendPath, portHandler))
 	}
 
 	authedHandler := func(next http.Handler) http.Handler {
@@ -128,6 +138,7 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		aead:          oauthAEAD,
 		emailToUserId: config.EmailToUserId,
 	})
+	mux.Handle(hostname+"/portupdate/", portUpdateMux)
 	mux.HandleFunc(hostname+"/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
@@ -143,6 +154,78 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		IsDevelopment:         config.GetServer().GetInsecure(),
 	})
 	return secureMiddleware.Handler(mux)
+}
+
+type backendProxyHandler struct {
+	mu   sync.Mutex
+	next http.Handler
+
+	port      int32
+	config    *pb.FrontendConfig_Backend
+	transport http.RoundTripper
+}
+
+func (b *backendProxyHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	b.mu.Lock()
+	next := b.next
+	b.mu.Unlock()
+
+	if next == nil {
+		http.Error(rw, "Backend unavailable", http.StatusInternalServerError)
+		return
+	}
+
+	next.ServeHTTP(rw, req)
+}
+
+func (b *backendProxyHandler) UpdatePort(port int32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.port == port {
+		return
+	}
+	b.port = port
+
+	backendURL, err := url.Parse(fmt.Sprintf("%v:%v", b.config.Host, b.port))
+	if err != nil {
+		glog.Fatalf("Backend url is invalid: %v", err)
+	}
+
+	backendProxy := httputil.NewSingleHostReverseProxy(backendURL)
+	backendProxy.Transport = b.transport
+	b.next = backendProxy
+}
+
+type portHandler struct {
+	b    *backendProxyHandler
+	aead cipher.AEAD
+}
+
+func (p *portHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	var update pb.PortUpdate
+	ok := DecryptProto(p.aead, req.URL.Path, nil, &update)
+	if !ok {
+		glog.Warningf("Got malformed port update: %v", req.URL.Path)
+		http.Error(rw, "Error", http.StatusInternalServerError)
+		return
+	}
+
+	p.b.UpdatePort(update.Port)
+
+	fmt.Fprintf(rw, "Alive.\n")
+	for {
+		time.Sleep(2 * time.Minute)
+
+		_, err := fmt.Fprintf(rw, "Still alive!\n")
+		if err != nil {
+			return
+		}
+
+		if f, ok := rw.(http.Flusher); ok {
+			f.Flush()
+		}
+	}
 }
 
 type authHandler struct {

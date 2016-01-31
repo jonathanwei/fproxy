@@ -17,5 +17,9 @@ message BackendConfig {
   Server server = 1;
 
   string serve_path = 2;
+
+  string port_update_url = 3;
+
+  bytes port_key = 4;
 }
 

@@ -20,12 +20,14 @@ message FrontendConfig {
   Server server = 2;
 
   message Backend {
-    string addr = 1;
-    string path = 2;
+    string host = 1;
+    string name = 2;
     oneof security {
       TLSConfig tls = 3;
       bool insecure = 4;
     }
+
+    bytes port_key = 5;
   }
   repeated Backend backend = 3;
 

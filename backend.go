@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -120,8 +121,13 @@ func getURL(url string) error {
 func getBackendHTTPMux(config *pb.BackendConfig) http.Handler {
 	mux := http.NewServeMux()
 
+	path, err := filepath.EvalSymlinks(config.ServePath)
+	if err != nil {
+		glog.Fatalf("Unable to resolve path: %v.", err)
+	}
+
 	fs := fileserver.Handler{
-		Base:      config.ServePath,
+		Base:      path,
 		DirPolicy: fileserver.AllowArchives,
 	}
 	mux.Handle("/", &fs)

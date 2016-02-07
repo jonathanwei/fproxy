@@ -26,8 +26,11 @@ var dirTmpl = template.Must(template.New("dir").Parse(`
 	</head>
 	<body>
 		<div>
-			<a href=".?m=zip" download>Download as zip</a>
+			Download as
+			<a href=".?m=zip" download="download.zip">zip</a>
+			<a href=".?m=tar" download="download.tar">tar</a>
 		</div>
+		<hr>
 		{{- range .Files -}}
 			<div>
 				<a href="{{.}}">{{.}}</a>
@@ -48,9 +51,10 @@ type htmlRenderer struct {
 	Files []string
 }
 
-func (h *htmlRenderer) Init(w io.Writer, title string) {
+func (h *htmlRenderer) Init(w io.Writer, title string) error {
 	h.w = w
 	h.Title = title
+	return nil
 }
 
 func (h *htmlRenderer) Walk(path string, finfo os.FileInfo, err error) error {

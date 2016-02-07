@@ -13,8 +13,9 @@ type zipRenderer struct {
 	root string
 }
 
-func (z *zipRenderer) Init(w io.Writer, title string) {
+func (z *zipRenderer) Init(w io.Writer, title string) error {
 	z.w = zip.NewWriter(w)
+	return nil
 }
 
 func (z *zipRenderer) Walk(path string, finfo os.FileInfo, err error) error {

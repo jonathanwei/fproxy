@@ -12,15 +12,18 @@ import (
 )
 
 type renderer interface {
-	Init(w io.Writer, title string)
+	Init(w io.Writer, title string) error
 	Walk(path string, finfo os.FileInfo, err error) error
 	Flush() error
 }
 
 func render(r renderer, w io.Writer, title, reqPath string) error {
-	r.Init(w, title)
+	err := r.Init(w, title)
+	if err != nil {
+		return err
+	}
 
-	err := filepath.Walk(reqPath, r.Walk)
+	err = filepath.Walk(reqPath, r.Walk)
 	if err != nil {
 		return err
 	}
@@ -83,7 +86,7 @@ func getRenderer(r renderType, root string) renderer {
 	case renderTypeHTML:
 		return &relativeRenderer{renderer: &htmlRenderer{}}
 	case renderTypeTAR:
-		return nil
+		return &relativeRenderer{renderer: &tarRenderer{root: root}}
 	case renderTypeZIP:
 		return &relativeRenderer{renderer: &zipRenderer{root: root}}
 	default:

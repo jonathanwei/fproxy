@@ -1,26 +1,44 @@
 package fileserver
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 	"os"
 	"path"
 	"strings"
-	"text/template"
 
 	"github.com/golang/glog"
 )
 
+type DirPolicy int
+
+const (
+	None DirPolicy = iota
+	AllowListing
+	AllowArchives
+)
+
 type Handler struct {
-	Base     string
-	ListDirs bool
+	Base      string
+	DirPolicy DirPolicy
 
 	// TODO: Configure URL signing.
 }
 
 func httpError(rw http.ResponseWriter, code int) {
 	http.Error(rw, http.StatusText(code), code)
+}
+
+func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	err := h.serveHTTP(rw, req)
+	if os.IsNotExist(err) {
+		glog.Warningf("Path was not found: %v", err)
+		http.NotFound(rw, req)
+		return
+	} else if err != nil {
+		glog.Warningf("Got error %v for path %v.", err, req.URL.Path)
+		httpError(rw, http.StatusInternalServerError)
+		return
+	}
 }
 
 func open(path string) (*os.File, os.FileInfo, error) {
@@ -37,31 +55,6 @@ func open(path string) (*os.File, os.FileInfo, error) {
 	return f, finfo, nil
 }
 
-// TODO: Use actual stylesheet.
-var dirTmpl = template.Must(template.New("dir").Parse(`
-<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="UTF-8">
-		<title>{{.Title}}</title>
-		<style>
-			* {
-				box-sizing: border-box;
-			}
-			body {
-				font-family: monospace;
-			}
-		</style>
-	</head>
-	<body>
-		{{- range .Files -}}
-			<a href="{{.}}">{{.}}</a><br>
-		{{- else -}}
-			<strong>No files.</strong>
-		{{- end -}}
-	</body>
-</html>`))
-
 func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) error {
 	reqPath := path.Join(h.Base, path.Clean("/"+req.URL.Path))
 
@@ -75,7 +68,7 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) error {
 		return nil
 	}
 
-	if !h.ListDirs {
+	if h.DirPolicy < AllowListing {
 		glog.Warningf("Disallowing ls on %v.", reqPath)
 		http.NotFound(rw, req)
 		return nil
@@ -92,43 +85,6 @@ func (h *Handler) serveHTTP(rw http.ResponseWriter, req *http.Request) error {
 		return nil
 	}
 
-	finfos, err := f.Readdir(-1)
-	if err != nil {
-		return err
-	}
-
-	var files []string
-	for _, chinfo := range finfos {
-		files = append(files, chinfo.Name())
-	}
-
-	data := struct {
-		Title string
-		Files []string
-	}{
-		title,
-		files,
-	}
-
-	var b bytes.Buffer
-	err = dirTmpl.Execute(&b, data)
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(rw, &b)
-	return err
-}
-
-func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	err := h.serveHTTP(rw, req)
-	if os.IsNotExist(err) {
-		glog.Warningf("Path was not found: %v", err)
-		http.NotFound(rw, req)
-		return
-	} else if err != nil {
-		glog.Warningf("Got error %v for path %v.", err, req.URL.Path)
-		httpError(rw, http.StatusInternalServerError)
-		return
-	}
+	r := getRenderer(getRenderType(h.DirPolicy, req.URL), reqPath)
+	return render(r, rw, title, reqPath)
 }

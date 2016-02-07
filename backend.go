@@ -120,7 +120,10 @@ func getURL(url string) error {
 func getBackendHTTPMux(config *pb.BackendConfig) http.Handler {
 	mux := http.NewServeMux()
 
-	fs := fileserver.Handler{Base: config.ServePath, ListDirs: true}
+	fs := fileserver.Handler{
+		Base:      config.ServePath,
+		DirPolicy: fileserver.AllowArchives,
+	}
 	mux.Handle("/", &fs)
 
 	return mux

@@ -13,6 +13,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/golang/glog"
+	"github.com/jonathanwei/fproxy/fileserver"
 	pb "github.com/jonathanwei/fproxy/proto"
 )
 
@@ -119,8 +120,8 @@ func getURL(url string) error {
 func getBackendHTTPMux(config *pb.BackendConfig) http.Handler {
 	mux := http.NewServeMux()
 
-	fs := http.FileServer(http.Dir(config.ServePath))
-	mux.Handle("/", fs)
+	fs := fileserver.Handler{Base: config.ServePath, ListDirs: true}
+	mux.Handle("/", &fs)
 
 	return mux
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/cipher"
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -20,41 +19,20 @@ import (
 
 	"github.com/golang/glog"
 	pb "github.com/jonathanwei/fproxy/proto"
-	"github.com/unrolled/secure"
 )
 
 func runHttpServer(config *pb.FrontendConfig) {
-	srvConfig := config.GetServer()
-
-	l, err := net.Listen("tcp", srvConfig.Addr)
-	if err != nil {
-		glog.Fatalf("Failed to listen on %v: %v", srvConfig.Addr, err)
-	}
-	defer l.Close()
-
-	glog.Infof("Listening for requests on %v", l.Addr())
+	glog.Infof("Listening for requests on %v", config.ServerAddr)
 
 	server := &http.Server{
+		Addr:    config.ServerAddr,
 		Handler: getFrontendHTTPMux(config),
 	}
 
-	if t := srvConfig.GetTls(); t != nil {
-		l = tls.NewListener(l, FrontendTLSConfigOrDie(t))
-	} else if srvConfig.GetInsecure() {
-		PrintServerInsecureWarning()
-	} else {
-		glog.Fatalf("The config must specify one of 'insecure' or 'tls'")
-	}
-
-	glog.Fatal(server.Serve(l))
+	glog.Fatal(server.ListenAndServe())
 }
 
 func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
-	hostname := config.GetServer().Hostname
-	if hostname == "" {
-		glog.Fatal("Must provide a hostname for the frontend.")
-	}
-
 	crypter := cookieCrypter{
 		aead:     NewAEADOrDie(config.AuthCookieKey),
 		insecure: config.AuthCookieInsecure,
@@ -115,7 +93,7 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 		backendPaths = append(backendPaths, backendPath)
 
 		// TODO: Find out why we can't have two levels of StripPrefix.
-		portUpdateMux.Handle(hostname+"/portupdate"+backendPath, http.StripPrefix("/portupdate"+backendPath, portHandler))
+		portUpdateMux.Handle("/portupdate"+backendPath, http.StripPrefix("/portupdate"+backendPath, portHandler))
 	}
 
 	authedHandler := func(next http.Handler) http.Handler {
@@ -128,32 +106,21 @@ func getFrontendHTTPMux(config *pb.FrontendConfig) http.Handler {
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle(hostname+"/", authedHandler(&feHandler{
+	mux.Handle("/", authedHandler(&feHandler{
 		backendPaths: backendPaths,
 		backendMux:   backendMux,
 	}))
-	mux.Handle(hostname+"/oauth2Callback", oauthHandler{
+	mux.Handle("/oauth2Callback", oauthHandler{
 		crypter:       crypter,
 		cfg:           oauthCfg,
 		aead:          oauthAEAD,
 		emailToUserId: config.EmailToUserId,
 	})
-	mux.Handle(hostname+"/portupdate/", portUpdateMux)
-	mux.HandleFunc(hostname+"/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
+	mux.Handle("/portupdate/", portUpdateMux)
+	mux.HandleFunc("/unauthorized", func(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Unauthorized", http.StatusUnauthorized)
 	})
-
-	secureMiddleware := secure.New(secure.Options{
-		STSSeconds:            60 * 60 * 24 * 365, // One year.
-		STSIncludeSubdomains:  true,
-		STSPreload:            true,
-		FrameDeny:             true,
-		ContentTypeNosniff:    true,
-		BrowserXssFilter:      true,
-		ContentSecurityPolicy: "default-src 'self'; style-src 'self' 'unsafe-inline'",
-		IsDevelopment:         config.GetServer().GetInsecure(),
-	})
-	return secureMiddleware.Handler(mux)
+	return mux
 }
 
 type backendProxyHandler struct {

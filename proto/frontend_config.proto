@@ -9,15 +9,7 @@ option go_package = "proto";
 message FrontendConfig {
   repeated TCPProxyRoute tcp_proxy_route = 1;
 
-  message Server {
-    string addr = 1;
-    string hostname = 2;
-    oneof security {
-      TLSConfig tls = 3;
-      bool insecure = 4;
-    }
-  }
-  Server server = 2;
+  string server_addr = 2;
 
   message Backend {
     string host = 1;

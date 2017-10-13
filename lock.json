@@ -1,6 +1,14 @@
 {
-    "memo": "4b22d4b9ebf173a3a9106ef53cb1feead84a734fd67ca68a0b7476e00b9a34c1",
+    "memo": "ed4a9bd8a50449e318ae3c461ae2e3e81e5cc0259ae0fd499f5b93b74133bbb3",
     "projects": [
+        {
+            "name": "cloud.google.com/go",
+            "version": "v0.15.0",
+            "revision": "eaddaf6dd7ee35fd3c2420c8d27478db176b0485",
+            "packages": [
+                "compute/metadata"
+            ]
+        },
         {
             "name": "github.com/codegangsta/cli",
             "branch": "master",
@@ -28,7 +36,7 @@
         {
             "name": "golang.org/x/net",
             "branch": "master",
-            "revision": "ffcf1bedda3b04ebb15a168a59800a73d6dc0f4d",
+            "revision": "a04bdaca5b32abe1c069418fb7088ae607de5bd0",
             "packages": [
                 "context",
                 "context/ctxhttp"
@@ -37,7 +45,7 @@
         {
             "name": "golang.org/x/oauth2",
             "branch": "master",
-            "revision": "8a57ed94ffd43444c0879fe75701732a38afc985",
+            "revision": "bb50c06baba3d0c76f9d125c0719093e315b5b44",
             "packages": [
                 ".",
                 "google",
@@ -72,15 +80,6 @@
                 "internal/remote_api",
                 "internal/urlfetch",
                 "urlfetch"
-            ]
-        },
-        {
-            "name": "google.golang.org/cloud",
-            "branch": "master",
-            "revision": "777d8f0a56610b58d4254b0db6c59d9afd58b5c6",
-            "packages": [
-                "compute/metadata",
-                "internal"
             ]
         },
         {

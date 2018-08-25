@@ -13,6 +13,8 @@ function main {
   go build -tags netgo -o "$WORKDIR"/fproxy .
 
   docker build -f ./Dockerfile -t fproxy:latest "$WORKDIR"
+
+  cp "$WORKDIR"/fproxy .
 }
 
 main "$@"
